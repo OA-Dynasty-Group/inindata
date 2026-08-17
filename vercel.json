@@ -5,13 +5,11 @@
     "NODE_ENV": "production",
     "FIELDWORK_PORT": "3000"
   },
-  "buildCommand": "npm ci",
-  "devCommand": "npm start",
   "installCommand": "npm ci",
   "framework": "node",
   "functions": {
     "server.js": {
-      "runtime": "nodejs18.x",
+      "runtime": "nodejs20.x",
       "memory": 512,
       "maxDuration": 30
     }
