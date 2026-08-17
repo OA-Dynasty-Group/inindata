@@ -1,2 +1,163 @@
-.dataset-page{max-width:1400px}.dataset-page .topbar{align-items:flex-end}.dataset-page .topbar h1{margin-bottom:5px}.dataset-meta,#datasetMeta{font-size:11px;color:#718079}.dataset-toolbar{display:flex;align-items:center;justify-content:space-between;margin:0 0 16px}.dataset-toolbar label{font-size:11px;font-weight:700;color:#586962}.dataset-toolbar input{display:block;width:235px;border:1px solid #d9e3dd;border-radius:6px;padding:9px;margin-top:5px;font:12px Manrope}.classification{font:500 10px 'DM Mono';letter-spacing:1px;color:#53675d;background:#e9f0eb;padding:5px 7px;border-radius:4px}.dataset-table-wrap{overflow:auto;border:1px solid #e1e8e4;border-radius:10px;background:#fff}table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}th{text-align:left;background:#f7f9f7;color:#66766f;padding:12px 14px;font:500 10px 'DM Mono';letter-spacing:.5px;border-bottom:1px solid #e1e8e4}td{padding:13px 14px;border-bottom:1px solid #edf1ee;color:#35473f;max-width:220px;overflow:hidden;text-overflow:ellipsis}.dataset-table-wrap tbody tr:last-child td{border-bottom:0}.record-status{font-size:10px;font-weight:700;text-transform:capitalize;background:#edf4ef;color:#47705a;padding:3px 6px;border-radius:8px}.dataset-empty{text-align:center;color:#718079;padding:38px}@media(max-width:600px){.dataset-toolbar{align-items:flex-end}.dataset-toolbar input{width:180px}}
-.dataset-actions{display:flex;gap:8px}.import-panel{border:1px solid #cee0d6;background:#f7fcf8;border-radius:10px;padding:20px;margin:0 0 20px}.import-panel h2{font-size:15px;margin:0 0 5px}.import-panel p:not(.eyebrow){color:#62736a;font-size:11px;line-height:1.6;margin:0}.import-controls{display:flex;gap:10px;align-items:center;margin-top:15px}.import-controls input{font:11px Manrope}.import-result{font-size:11px;line-height:1.7;color:#43584d;background:#fff;border-radius:6px;padding:10px;margin-top:15px}.import-result.error{color:#9f4037;background:#fff2f0}
+.dataset-page {
+  max-width:1400px;
+}
+
+.dataset-page .topbar {
+  align-items:flex-end;
+}
+
+.dataset-page .topbar h1 {
+  margin-bottom:5px;
+}
+
+.dataset-meta,#datasetMeta {
+  font-size:11px;
+  color:#718079;
+}
+
+.dataset-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin:0 0 16px;
+}
+
+.dataset-toolbar label {
+  font-size:11px;
+  font-weight:700;
+  color:#586962;
+}
+
+.dataset-toolbar input {
+  display:block;
+  width:235px;
+  border:1px solid #d9e3dd;
+  border-radius:6px;
+  padding:9px;
+  margin-top:5px;
+  font:12px Manrope;
+}
+
+.classification {
+  font:500 10px 'DM Mono';
+  letter-spacing:1px;
+  color:#53675d;
+  background:#e9f0eb;
+  padding:5px 7px;
+  border-radius:4px;
+}
+
+.dataset-table-wrap {
+  overflow:auto;
+  border:1px solid #e1e8e4;
+  border-radius:10px;
+  background:#fff;
+}
+
+table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:11px;
+  white-space:nowrap;
+}
+
+th {
+  text-align:left;
+  background:#f7f9f7;
+  color:#66766f;
+  padding:12px 14px;
+  font:500 10px 'DM Mono';
+  letter-spacing:.5px;
+  border-bottom:1px solid #e1e8e4;
+}
+
+td {
+  padding:13px 14px;
+  border-bottom:1px solid #edf1ee;
+  color:#35473f;
+  max-width:220px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.dataset-table-wrap tbody tr:last-child td {
+  border-bottom:0;
+}
+
+.record-status {
+  font-size:10px;
+  font-weight:700;
+  text-transform:capitalize;
+  background:#edf4ef;
+  color:#47705a;
+  padding:3px 6px;
+  border-radius:8px;
+}
+
+.dataset-empty {
+  text-align:center;
+  color:#718079;
+  padding:38px;
+}
+
+@media(max-width:600px) {
+  .dataset-toolbar {
+    align-items:flex-end;
+  }
+
+  .dataset-toolbar input {
+    width:180px;
+  }
+
+}
+
+.dataset-actions {
+  display:flex;
+  gap:8px;
+}
+
+.import-panel {
+  border:1px solid #cee0d6;
+  background:#f7fcf8;
+  border-radius:10px;
+  padding:20px;
+  margin:0 0 20px;
+}
+
+.import-panel h2 {
+  font-size:15px;
+  margin:0 0 5px;
+}
+
+.import-panel p:not(.eyebrow) {
+  color:#62736a;
+  font-size:11px;
+  line-height:1.6;
+  margin:0;
+}
+
+.import-controls {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:15px;
+}
+
+.import-controls input {
+  font:11px Manrope;
+}
+
+.import-result {
+  font-size:11px;
+  line-height:1.7;
+  color:#43584d;
+  background:#fff;
+  border-radius:6px;
+  padding:10px;
+  margin-top:15px;
+}
+
+.import-result.error {
+  color:#9f4037;
+  background:#fff2f0;
+}

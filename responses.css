@@ -1,1 +1,83 @@
-.responses-page{max-width:1040px}.response-summary{display:flex;align-items:baseline;gap:9px;margin:0 0 18px}.response-summary strong{font-size:28px;letter-spacing:-1px}.response-summary span{color:#6d7a75;font-size:12px}.response-list{background:#fff;border:1px solid #e6ebe8;border-radius:10px}.response-row{display:flex;align-items:center;gap:16px;padding:16px 18px;border-bottom:1px solid #edf1ee}.response-row:last-child{border:0}.response-row strong{font:600 12px 'DM Mono';display:block}.response-row small{display:block;color:#75837c;font-size:10px;margin-top:4px}.response-row .response-status{margin-left:auto;text-transform:capitalize;font-size:10px;font-weight:700;padding:4px 7px;border-radius:10px;background:#edf3ef;color:#476156}.response-row button{margin-left:5px;border:1px solid #cbd8d1;background:#fff;border-radius:5px;padding:6px 8px;font:700 10px Manrope;color:#075f48;cursor:pointer}.response-row button.reject{color:#a74b41}.response-empty{padding:42px;text-align:center;color:#73827a;font-size:12px}
+.responses-page {
+  max-width:1040px;
+}
+
+.response-summary {
+  display:flex;
+  align-items:baseline;
+  gap:9px;
+  margin:0 0 18px;
+}
+
+.response-summary strong {
+  font-size:28px;
+  letter-spacing:-1px;
+}
+
+.response-summary span {
+  color:#6d7a75;
+  font-size:12px;
+}
+
+.response-list {
+  background:#fff;
+  border:1px solid #e6ebe8;
+  border-radius:10px;
+}
+
+.response-row {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:16px 18px;
+  border-bottom:1px solid #edf1ee;
+}
+
+.response-row:last-child {
+  border:0;
+}
+
+.response-row strong {
+  font:600 12px 'DM Mono';
+  display:block;
+}
+
+.response-row small {
+  display:block;
+  color:#75837c;
+  font-size:10px;
+  margin-top:4px;
+}
+
+.response-row .response-status {
+  margin-left:auto;
+  text-transform:capitalize;
+  font-size:10px;
+  font-weight:700;
+  padding:4px 7px;
+  border-radius:10px;
+  background:#edf3ef;
+  color:#476156;
+}
+
+.response-row button {
+  margin-left:5px;
+  border:1px solid #cbd8d1;
+  background:#fff;
+  border-radius:5px;
+  padding:6px 8px;
+  font:700 10px Manrope;
+  color:#075f48;
+  cursor:pointer;
+}
+
+.response-row button.reject {
+  color:#a74b41;
+}
+
+.response-empty {
+  padding:42px;
+  text-align:center;
+  color:#73827a;
+  font-size:12px;
+}

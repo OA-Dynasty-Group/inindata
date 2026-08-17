@@ -8,6 +8,11 @@
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
+          "lib/**",
+          "routes/**",
+          "db/**",
+          "api/**",
+          "email/**",
           "*.html",
           "*.css",
           "app.js",
@@ -15,7 +20,9 @@
           "export.js",
           "analytics.js",
           "collect.js",
-          "organization-and-reset.js"
+          "organization-and-reset.js",
+          "package.json",
+          "package-lock.json"
         ]
       }
     }

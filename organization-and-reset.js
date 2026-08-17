@@ -1,222 +1,164 @@
 // Organization and password reset management
 // This file handles Phase 3 flows: organization management and password reset
 
-/**
- * Load and display organization settings
- */
+const toast = App.ui.toast;
+const escapeHtml = App.ui.escapeHtml;
+
+App.org = {};
+
+App.state.passwordResetStep = 'email';
+App.state.passwordResetToken = null;
+
 async function loadOrganization() {
   try {
     const response = await fetch('/api/organization');
     const org = await response.json();
     if (!response.ok) throw new Error(org.error);
-    
-    document.getElementById('organizationNameDisplay').innerHTML = `<p>${escapeHtml(org.name)}</p>`;
-    document.getElementById('organizationName').value = org.name;
-    
-    // Load member count
+
+    App.$('#organizationNameDisplay').innerHTML = `<p>${escapeHtml(org.name)}</p>`;
+    App.$('#organizationName').value = org.name;
+
     const usersResponse = await fetch('/api/users');
     const users = await usersResponse.json();
-    document.getElementById('memberCount').innerHTML = `<strong>${users.length}</strong> team members`;
+    App.$('#memberCount').innerHTML = `<strong>${users.length}</strong> team members`;
   } catch (error) {
-    document.getElementById('organizationDisplay').innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+    App.$('#organizationDisplay').innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
   }
 }
 
-/**
- * Save organization settings
- */
-document.getElementById('organizationForm').onsubmit = async (event) => {
-  event.preventDefault();
-  try {
-    const response = await fetch('/api/organization', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: document.getElementById('organizationName').value })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
-    document.getElementById('organizationForm').hidden = true;
-    document.getElementById('organizationDisplay').hidden = false;
-    toast('Organization name updated.');
-    loadOrganization();
-  } catch (error) {
-    toast(error.message);
-  }
-};
-
-document.getElementById('editOrganization').onclick = () => {
-  document.getElementById('organizationDisplay').hidden = true;
-  document.getElementById('organizationForm').hidden = false;
-  document.getElementById('organizationName').focus();
-};
-
-/**
- * Password reset flow
- */
-let passwordResetStep = 'email'; // email -> confirm -> reset
-let passwordResetToken = null;
-
-/**
- * Show password reset form, optionally with a token from email link
- * @param {string} [token] - Recovery token from Supabase Auth email link
- */
 function showPasswordResetForm(token) {
-  document.getElementById('loginOverlay').hidden = true;
-  document.getElementById('signupOverlay').hidden = true;
-  document.getElementById('passwordResetOverlay').hidden = false;
+  App.$('#loginOverlay').hidden = true;
+  App.$('#signupOverlay').hidden = true;
+  App.$('#passwordResetOverlay').hidden = false;
 
   if (token) {
-    // Token from email link — skip to password entry
-    passwordResetToken = token;
-    passwordResetStep = 'reset';
-    document.getElementById('resetTitle').textContent = 'Set your new password';
-    document.getElementById('resetDescription').textContent = 'Enter your new password below.';
-    document.getElementById('resetEmailLabel').hidden = true;
-    document.getElementById('resetTokenLabel').hidden = true;
-    document.getElementById('resetPasswordLabel').hidden = false;
-    document.getElementById('resetPasswordConfirmLabel').hidden = false;
-    document.getElementById('resetPassword').value = '';
-    document.getElementById('resetPasswordConfirm').value = '';
-    document.getElementById('resetButton').textContent = 'Reset password';
-    document.getElementById('resetButton').onclick = null;
-    document.getElementById('resetError').hidden = true;
-    document.getElementById('resetPassword').focus();
+    App.state.passwordResetToken = token;
+    App.state.passwordResetStep = 'reset';
+    App.$('#resetTitle').textContent = 'Set your new password';
+    App.$('#resetDescription').textContent = 'Enter your new password below.';
+    App.$('#resetEmailLabel').hidden = true;
+    App.$('#resetTokenLabel').hidden = true;
+    App.$('#resetPasswordLabel').hidden = false;
+    App.$('#resetPasswordConfirmLabel').hidden = false;
+    App.$('#resetPassword').value = '';
+    App.$('#resetPasswordConfirm').value = '';
+    App.$('#resetButton').textContent = 'Reset password';
+    App.$('#resetButton').onclick = null;
+    App.$('#resetError').hidden = true;
+    App.$('#resetPassword').focus();
   } else {
-    // No token — start from email entry
-    passwordResetToken = null;
-    passwordResetStep = 'email';
-    document.getElementById('resetTitle').textContent = 'Reset your password';
-    document.getElementById('resetDescription').textContent = 'Enter your email to receive a password reset link.';
-    document.getElementById('resetEmailLabel').hidden = false;
-    document.getElementById('resetTokenLabel').hidden = true;
-    document.getElementById('resetPasswordLabel').hidden = true;
-    document.getElementById('resetPasswordConfirmLabel').hidden = true;
-    document.getElementById('resetButton').textContent = 'Send reset link';
-    document.getElementById('resetButton').onclick = null;
-    document.getElementById('resetError').hidden = true;
-    document.getElementById('passwordResetForm').reset();
-    document.getElementById('resetEmail').focus();
+    App.state.passwordResetToken = null;
+    App.state.passwordResetStep = 'email';
+    App.$('#resetTitle').textContent = 'Reset your password';
+    App.$('#resetDescription').textContent = 'Enter your email to receive a password reset link.';
+    App.$('#resetEmailLabel').hidden = false;
+    App.$('#resetTokenLabel').hidden = true;
+    App.$('#resetPasswordLabel').hidden = true;
+    App.$('#resetPasswordConfirmLabel').hidden = true;
+    App.$('#resetButton').textContent = 'Send reset link';
+    App.$('#resetButton').onclick = null;
+    App.$('#resetError').hidden = true;
+    App.$('#passwordResetForm').reset();
+    App.$('#resetEmail').focus();
   }
 }
 
 function showLoginForm() {
-  document.getElementById('passwordResetOverlay').hidden = true;
-  document.getElementById('signupOverlay').hidden = true;
-  document.getElementById('loginOverlay').hidden = false;
-  document.getElementById('loginEmail').focus();
+  App.$('#passwordResetOverlay').hidden = true;
+  App.$('#signupOverlay').hidden = true;
+  App.$('#loginOverlay').hidden = false;
+  App.$('#loginEmail').focus();
 }
 
-/**
- * Handle password reset form submission
- */
-document.getElementById('passwordResetForm').onsubmit = async (event) => {
-  event.preventDefault();
-  const error = document.getElementById('resetError');
-  error.hidden = true;
-
-  try {
-    if (passwordResetStep === 'email') {
-      // Step 1: Request password reset
-      const email = document.getElementById('resetEmail').value.trim();
-      if (!email) throw new Error('Enter your email address.');
-
-      const response = await fetch('/api/auth/password-reset', {
-        method: 'POST',
+function setupOrgPage() {
+  App.$('#organizationForm').onsubmit = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await fetch('/api/organization', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ name: App.$('#organizationName').value })
       });
-
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-
-      document.getElementById('resetTitle').textContent = 'Check your email';
-      document.getElementById('resetDescription').textContent = 'We\'ve sent a password reset link to your email. Click the link or enter the reset code below.';
-      document.getElementById('resetEmailLabel').hidden = true;
-      document.getElementById('resetTokenLabel').hidden = false;
-      document.getElementById('resetPasswordLabel').hidden = false;
-      document.getElementById('resetPasswordConfirmLabel').hidden = false;
-      document.getElementById('resetButton').textContent = 'Reset password';
-      
-      passwordResetStep = 'reset';
-      error.textContent = 'Check your email for the reset link. If you don\'t see it, check your spam folder.';
-      error.hidden = false;
-      error.className = 'login-info';
-    } else if (passwordResetStep === 'reset') {
-      // Step 2: Confirm password reset
-      const token = passwordResetToken || document.getElementById('resetToken').value.trim();
-      const password = document.getElementById('resetPassword').value;
-      const confirm = document.getElementById('resetPasswordConfirm').value;
-
-      if (!token) throw new Error('Enter the reset code from your email.');
-      if (password.length < 12) throw new Error('Password must be at least 12 characters.');
-      if (password !== confirm) throw new Error('Passwords do not match.');
-
-      const response = await fetch('/api/auth/password-reset/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password })
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
-
-      // Success
-      document.getElementById('resetTitle').textContent = 'Password reset successful!';
-      document.getElementById('resetDescription').textContent = 'Your password has been updated. You can now sign in with your new password.';
-      document.getElementById('passwordResetForm').reset();
-      document.getElementById('resetButton').textContent = 'Return to sign in';
-      document.getElementById('resetButton').onclick = () => showLoginForm();
-      passwordResetToken = null;
+      App.$('#organizationForm').hidden = true;
+      App.$('#organizationDisplay').hidden = false;
+      toast('Organization name updated.');
+      loadOrganization();
+    } catch (error) {
+      toast(error.message);
     }
-  } catch (reason) {
-    error.textContent = reason.message;
-    error.hidden = false;
-    error.className = 'login-error';
-  }
-};
+  };
 
-/**
- * Handle browser back button for password reset
- */
-window.addEventListener('hashchange', () => {
-  const hash = location.hash;
-  if (hash === '#password-reset') {
-    showPasswordResetForm();
-  } else if (hash.startsWith('#reset-password/')) {
-    const token = hash.replace('#reset-password/', '');
-    showPasswordResetForm(token);
-  } else if (hash === '#login' || hash === '') {
-    showLoginForm();
-  } else if (hash === '#signup') {
-    document.getElementById('loginOverlay').hidden = true;
-    document.getElementById('passwordResetOverlay').hidden = true;
-    document.getElementById('signupOverlay').hidden = false;
-  }
-});
+  App.$('#editOrganization').onclick = () => {
+    App.$('#organizationDisplay').hidden = true;
+    App.$('#organizationForm').hidden = false;
+    App.$('#organizationName').focus();
+  };
 
-/**
- * Settings page loader
- */
-async function showSettingsPage() {
-  const target = location.hash.slice(1);
-  if (target === 'settings') {
-    loadOrganization();
-  }
-}
+  App.$('#passwordResetForm').onsubmit = async (event) => {
+    event.preventDefault();
+    const error = App.$('#resetError');
+    error.hidden = true;
 
-window.addEventListener('hashchange', showSettingsPage);
+    try {
+      if (App.state.passwordResetStep === 'email') {
+        const email = App.$('#resetEmail').value.trim();
+        if (!email) throw new Error('Enter your email address.');
 
-/**
- * Utility: escape HTML
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+        const response = await fetch('/api/auth/password-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
 
-// Initialize password reset links
-document.addEventListener('DOMContentLoaded', () => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+
+        App.$('#resetTitle').textContent = 'Check your email';
+        App.$('#resetDescription').textContent = 'We\'ve sent a password reset link to your email. Click the link or enter the reset code below.';
+        App.$('#resetEmailLabel').hidden = true;
+        App.$('#resetTokenLabel').hidden = false;
+        App.$('#resetPasswordLabel').hidden = false;
+        App.$('#resetPasswordConfirmLabel').hidden = false;
+        App.$('#resetButton').textContent = 'Reset password';
+
+        App.state.passwordResetStep = 'reset';
+        error.textContent = 'Check your email for the reset link. If you don\'t see it, check your spam folder.';
+        error.hidden = false;
+        error.className = 'login-info';
+      } else if (App.state.passwordResetStep === 'reset') {
+        const token = App.state.passwordResetToken || App.$('#resetToken').value.trim();
+        const password = App.$('#resetPassword').value;
+        const confirm = App.$('#resetPasswordConfirm').value;
+
+        if (!token) throw new Error('Enter the reset code from your email.');
+        if (password.length < 12) throw new Error('Password must be at least 12 characters.');
+        if (password !== confirm) throw new Error('Passwords do not match.');
+
+        const response = await fetch('/api/auth/password-reset/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+
+        App.$('#resetTitle').textContent = 'Password reset successful!';
+        App.$('#resetDescription').textContent = 'Your password has been updated. You can now sign in with your new password.';
+        App.$('#passwordResetForm').reset();
+        App.$('#resetButton').textContent = 'Return to sign in';
+        App.$('#resetButton').onclick = () => showLoginForm();
+        App.state.passwordResetToken = null;
+      }
+    } catch (reason) {
+      error.textContent = reason.message;
+      error.hidden = false;
+      error.className = 'login-error';
+    }
+  };
+
   const loginLinks = document.querySelectorAll('a[href="#password-reset"]');
   loginLinks.forEach(link => {
     link.addEventListener('click', (e) => {
@@ -225,4 +167,15 @@ document.addEventListener('DOMContentLoaded', () => {
       location.hash = '#password-reset';
     });
   });
-});
+}
+
+App.org.loadOrganization = loadOrganization;
+App.org.showPasswordResetForm = showPasswordResetForm;
+App.org.showLoginForm = showLoginForm;
+App.org.setupSettingsPage = function() {
+  const target = location.hash.slice(1);
+  if (target === 'settings') {
+    loadOrganization();
+  }
+};
+App.org.setup = setupOrgPage;

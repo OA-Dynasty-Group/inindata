@@ -73,8 +73,8 @@
         <nav aria-label="Main navigation">
           <a class="nav-link active" href="#dashboard"><span>⌑</span>Overview</a>
           <p class="nav-label">Collect</p>
-          <a class="nav-link" href="#forms"><span>◫</span>Forms <b>4</b></a>
-          <a class="nav-link" href="#responses"><span>▤</span>Responses <b>12</b></a>
+          <a class="nav-link" href="#forms"><span>◫</span>Forms <b id="navFormCount">0</b></a>
+          <a class="nav-link" href="#responses"><span>▤</span>Responses <b id="navResponseCount">0</b></a>
           <p class="nav-label">Organize</p>
           <a class="nav-link" href="#programs"><span>◌</span>Programs</a>
           <a class="nav-link" href="#datasets"><span>▦</span>Datasets</a>
@@ -87,15 +87,83 @@
           <p class="nav-label">Settings</p>
           <a class="nav-link" href="#settings"><span>⚙</span>Organization</a>
         </nav>
-        <div class="sidebar-footer"><a href="#settings" style="text-decoration: none; color: inherit;"><div class="org-avatar">CR</div><div><strong>Community Reach</strong><small>Organization settings</small></div><span>⌄</span></a></div>
+        <div class="sidebar-footer"><a href="#settings" style="text-decoration: none; color: inherit;"><div class="org-avatar" id="sidebarAvatar">U</div><div><strong id="sidebarOrgName">Fieldwork</strong><small>Organization settings</small></div><span>⌄</span></a></div>
       </aside>
 
       <main>
         <section id="dashboard" class="page dashboard-page">
-          <header class="topbar"><div><p class="eyebrow">Community Reach</p><h1>Good morning, Amina.</h1></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♢<i></i></button><button class="avatar" aria-label="Account menu">AM</button></div></header>
-          <div class="welcome-card"><div><p class="eyebrow">DATA COLLECTION · AUGUST 2026</p><h2>Make every response<br />count for more.</h2><p>See how your programs are progressing, and act on the stories your data is telling.</p><a href="#builder" class="button primary">Create a form <span>→</span></a></div><div class="card-graphic" aria-hidden="true"><div class="sun"></div><div class="hill hill-one"></div><div class="hill hill-two"></div><div class="dots">···<br/>····<br/>·····</div></div></div>
-          <section class="metric-grid" aria-label="Key metrics"><article><p>Responses this month</p><h3>1,284</h3><span class="positive">↗ 18.4% <em>vs. last month</em></span><div class="spark spark-green"></div></article><article><p>Active forms</p><h3>4 <small>of 7 total</small></h3><span class="neutral">2 collecting today</span><div class="form-dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article><article><p>Review queue</p><h3>12</h3><span class="warning">● Needs attention</span><a href="#responses">Review responses →</a></article></section>
-          <section class="content-grid"><article class="panel activity"><div class="panel-head"><div><h2>Recent activity</h2><p>Across your organization</p></div><a href="#audit">View all</a></div><div class="activity-list"><div><span class="event-icon green">↑</span><p><strong>124 responses received</strong><small>Community needs assessment · 16 min ago</small></p><time>10:42</time></div><div><span class="event-icon blue">✓</span><p><strong>Baseline survey published</strong><small>Youth employment program · 2 hours ago</small></p><time>08:31</time></div><div><span class="event-icon orange">↓</span><p><strong>Dataset imported</strong><small>2025 program outcomes · Yesterday</small></p><time>Aug 14</time></div></div></article><article class="panel focus"><p class="eyebrow">PROGRAM PULSE</p><h2>Youth Employment</h2><p>August collection progress</p><div class="progress-row"><div class="donut"><span>68<small>%</small></span></div><div><strong>816 <small>of 1,200</small></strong><p>Target responses</p><button class="text-button">View program →</button></div></div></article></section><section class="saved-dashboard panel"><div class="panel-head"><div><h2>Saved dashboards</h2><p>Reusable views of your organization’s data</p></div><a href="#analytics">Create view</a></div><div id="dashboardList" class="dashboard-list">Loading saved dashboards…</div></section>
+          <header class="topbar">
+            <div>
+              <p class="eyebrow" id="dashboardOrg">Loading...</p>
+              <h1 id="dashboardGreeting">Good morning</h1>
+            </div>
+            <div class="top-actions">
+              <button class="icon-button" aria-label="Notifications">♢<i></i></button>
+              <button class="avatar" aria-label="Account menu" id="userAvatar">U</button>
+            </div>
+          </header>
+          <div class="welcome-card">
+            <div>
+              <p class="eyebrow">DATA COLLECTION</p>
+              <h2>Make every response<br/>count for more.</h2>
+              <p>See how your programs are progressing, and act on the stories your data is telling.</p>
+              <a href="#builder" class="button primary">Create a form <span>→</span></a>
+            </div>
+            <div class="card-graphic" aria-hidden="true">
+              <div class="sun"></div>
+              <div class="hill hill-one"></div>
+              <div class="hill hill-two"></div>
+              <div class="dots">···<br/>····<br/>·····</div>
+            </div>
+          </div>
+          <section class="metric-grid" aria-label="Key metrics">
+            <article>
+              <p>Responses this month</p>
+              <h3 id="metricThisMonth">—</h3>
+              <span class="neutral">Collecting responses</span>
+            </article>
+            <article>
+              <p>Active forms</p>
+              <h3 id="metricForms">— <small>of 0 total</small></h3>
+              <span class="neutral" id="programStats">0 programs</span>
+            </article>
+            <article>
+              <p>Review queue</p>
+              <h3 id="metricPending">0</h3>
+              <span class="neutral" id="metricResponses">0 total responses</span>
+              <a href="#responses">Review responses →</a>
+            </article>
+          </section>
+          <section class="content-grid">
+            <article class="panel activity">
+              <div class="panel-head">
+                <div>
+                  <h2>Recent activity</h2>
+                  <p>Across your organization</p>
+                </div>
+                <a href="#audit">View all</a>
+              </div>
+              <ul class="activity-list" id="activityFeed">
+                <li class="activity-item activity-item--empty">No recent activity</li>
+              </ul>
+            </article>
+            <article class="panel focus">
+              <p class="eyebrow">PROGRAM PULSE</p>
+              <h2>Welcome to Fieldwork</h2>
+              <p>Create your first form to start collecting data</p>
+              <a href="#builder" class="button primary">Create a form <span>→</span></a>
+            </article>
+          </section>
+          <section class="saved-dashboard panel">
+            <div class="panel-head">
+              <div>
+                <h2>Saved dashboards</h2>
+                <p>Reusable views of your organization's data</p>
+              </div>
+              <a href="#analytics">Create view</a>
+            </div>
+            <div id="dashboardList" class="dashboard-list">Loading saved dashboards…</div>
+          </section>
         </section>
 
         <section id="forms" class="page forms-page" hidden><header class="topbar"><div><p class="eyebrow">DATA COLLECTION</p><h1>Forms</h1><p>Create and manage dynamic instruments for programs and research.</p></div><button class="button primary" id="newInstrument">New form <span>+</span></button></header><div class="instrument-list" id="instrumentList">Loading forms…</div></section>
@@ -119,10 +187,15 @@
       </main>
     </div>
     <div class="toast" id="toast" role="status"></div>
+    <script src="ui-helpers.js"></script>
+    <script src="app-state.js"></script>
+    <script src="loading.js"></script>
+    <script src="client-router.js"></script>
+    <script src="dashboard.js"></script>
     <script src="app.js"></script>
-    <script src="organization-and-reset.js"></script>
     <script src="charts.js"></script>
     <script src="analytics.js"></script>
     <script src="export.js"></script>
+    <script src="organization-and-reset.js"></script>
   </body>
 </html>

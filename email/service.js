@@ -105,6 +105,15 @@ function initializeDevMailer() {
 /**
  * Email templates
  */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const templates = {
   // User invitation template
   userInvitation: (userName, inviterName, organizationName, inviteUrl) => ({
@@ -127,9 +136,9 @@ Fieldwork Team
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333;">
-  <h2>You're invited to ${organizationName}!</h2>
-  <p>Hello ${userName},</p>
-  <p><strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> on the Fieldwork data platform.</p>
+  <h2>You're invited to ${escapeHtml(organizationName)}!</h2>
+  <p>Hello ${escapeHtml(userName)},</p>
+  <p><strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(organizationName)}</strong> on the Fieldwork data platform.</p>
   <p>
     <a href="${inviteUrl}" style="display: inline-block; padding: 12px 20px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;">
       Accept Invitation
@@ -164,9 +173,9 @@ Fieldwork Team
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333;">
   <h2>Thank you for your submission!</h2>
-  <p>Hello ${respondentName},</p>
-  <p>We have successfully received your response to the form <strong>"${formName}"</strong>.</p>
-  <p><strong>Submission ID:</strong> <code style="background: #f0f0f0; padding: 2px 6px;">${submissionId}</code></p>
+  <p>Hello ${escapeHtml(respondentName)},</p>
+  <p>We have successfully received your response to the form <strong>"${escapeHtml(formName)}"</strong>.</p>
+  <p><strong>Submission ID:</strong> <code style="background: #f0f0f0; padding: 2px 6px;">${escapeHtml(submissionId)}</code></p>
   <p>If you have any questions, please contact the form administrator.</p>
   <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
   <p style="color: #999; font-size: 12px;">© 2026 Fieldwork. All rights reserved.</p>
@@ -200,12 +209,12 @@ Fieldwork Team
 <body style="font-family: Arial, sans-serif; color: #333;">
   <h2>Your submission has been reviewed</h2>
   <p>Hello,</p>
-  <p>Your submission to <strong>"${formName}"</strong> has been reviewed and marked as <strong>${status.toUpperCase()}</strong>.</p>
+  <p>Your submission to <strong>"${escapeHtml(formName)}"</strong> has been reviewed and marked as <strong>${escapeHtml(status.toUpperCase())}</strong>.</p>
   <p>
-    <strong>Submission ID:</strong> <code style="background: #f0f0f0; padding: 2px 6px;">${submissionId}</code><br>
-    <strong>Status:</strong> ${status}
+    <strong>Submission ID:</strong> <code style="background: #f0f0f0; padding: 2px 6px;">${escapeHtml(submissionId)}</code><br>
+    <strong>Status:</strong> ${escapeHtml(status)}
   </p>
-  ${notes ? `<p><strong>Reviewer notes:</strong></p><p>${notes.split('\n').join('<br>')}</p>` : ''}
+  ${notes ? `<p><strong>Reviewer notes:</strong></p><p>${escapeHtml(notes).split('\n').join('<br>')}</p>` : ''}
   <p>If you have questions about this decision, please contact the reviewer.</p>
   <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
   <p style="color: #999; font-size: 12px;">© 2026 Fieldwork. All rights reserved.</p>
@@ -240,8 +249,8 @@ Fieldwork Team
   <p>Hello,</p>
   <p>A new form has been published and is ready for data collection.</p>
   <p>
-    <strong>Program:</strong> ${programName}<br>
-    <strong>Form:</strong> ${formName}
+    <strong>Program:</strong> ${escapeHtml(programName)}<br>
+    <strong>Form:</strong> ${escapeHtml(formName)}
   </p>
   <p>
     <a href="${collectionUrl}" style="display: inline-block; padding: 12px 20px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;">
@@ -279,7 +288,7 @@ Fieldwork Team
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333;">
   <h2>Reset your password</h2>
-  <p>Hello ${userName},</p>
+  <p>Hello ${escapeHtml(userName)},</p>
   <p>You requested a password reset for your Fieldwork account.</p>
   <p>
     <a href="${resetUrl}" style="display: inline-block; padding: 12px 20px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px;">
@@ -318,25 +327,25 @@ Fieldwork Team
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333;">
-  <h2>Weekly Report for ${organizationName}</h2>
-  <p>Hello ${userName},</p>
+  <h2>Weekly Report for ${escapeHtml(organizationName)}</h2>
+  <p>Hello ${escapeHtml(userName)},</p>
   <p>Here's your weekly summary:</p>
   <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
     <tr style="background: #f5f5f5;">
       <td style="padding: 10px; border: 1px solid #ddd;"><strong>Submissions received</strong></td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${stats.submissionsReceived}</td>
+      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${escapeHtml(stats.submissionsReceived)}</td>
     </tr>
     <tr>
       <td style="padding: 10px; border: 1px solid #ddd;"><strong>Forms active</strong></td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${stats.formsActive}</td>
+      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${escapeHtml(stats.formsActive)}</td>
     </tr>
     <tr style="background: #f5f5f5;">
       <td style="padding: 10px; border: 1px solid #ddd;"><strong>Active users</strong></td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${stats.usersActive}</td>
+      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${escapeHtml(stats.usersActive)}</td>
     </tr>
     <tr>
       <td style="padding: 10px; border: 1px solid #ddd;"><strong>Data reviewed</strong></td>
-      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${stats.dataReviewed}</td>
+      <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${escapeHtml(stats.dataReviewed)}</td>
     </tr>
   </table>
   <p>

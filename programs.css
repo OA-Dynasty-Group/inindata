@@ -1,1 +1,120 @@
-.programs-page{max-width:1100px}.programs-page .topbar{align-items:flex-end}.programs-page .topbar h1{margin-bottom:7px}.programs-page .topbar>div>p:last-child{font-size:12px;color:#6d7c75}.program-form{display:grid;grid-template-columns:1.2fr .6fr 1.5fr auto;gap:10px;align-items:end;background:#f4faf6;border:1px solid #d3e5d9;border-radius:10px;padding:15px;margin-bottom:20px}.program-form label{font-size:10px;font-weight:700;color:#65756d}.program-form input{display:block;width:100%;margin-top:5px;padding:9px;border:1px solid #d1ddd6;border-radius:6px;background:#fff;font:12px Manrope}.program-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:15px}.program-card{background:#fff;border:1px solid #e0e8e3;border-radius:10px;padding:20px}.program-card h2{font-size:16px;margin:0 0 5px}.program-card .code{font:500 10px 'DM Mono';color:#54816c}.program-card>p{font-size:11px;line-height:1.6;color:#6a7a73;min-height:35px}.program-card h3{font-size:11px;margin:18px 0 8px}.project-list{display:grid;gap:5px}.project{display:flex;justify-content:space-between;padding:8px;background:#f6f9f7;border-radius:5px;font-size:11px}.project span{font-size:9px;text-transform:capitalize;color:#648171}.add-project{margin-top:11px;border:0;background:none;padding:0;color:#087052;font:700 11px Manrope;cursor:pointer}@media(max-width:700px){.program-form{grid-template-columns:1fr}.program-form .button{width:max-content}}
+.programs-page {
+  max-width: 1100px;
+}
+
+.programs-page .topbar {
+  align-items: flex-end;
+}
+
+.programs-page .topbar h1 {
+  margin-bottom: 7px;
+}
+
+.programs-page .topbar > div > p:last-child {
+  font-size: 12px;
+  color: #6d7c75;
+}
+
+.program-form {
+  display: grid;
+  grid-template-columns: 1.2fr .6fr 1.5fr auto;
+  gap: 10px;
+  align-items: end;
+  background: #f4faf6;
+  border: 1px solid #d3e5d9;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.program-form label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #65756d;
+}
+
+.program-form input {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 9px;
+  border: 1px solid #d1ddd6;
+  border-radius: 6px;
+  background: #fff;
+  font: 12px Manrope;
+}
+
+.program-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 15px;
+}
+
+.program-card {
+  background: #fff;
+  border: 1px solid #e0e8e3;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.program-card h2 {
+  font-size: 16px;
+  margin: 0 0 5px;
+}
+
+.program-card .code {
+  font: 500 10px 'DM Mono';
+  color: #54816c;
+}
+
+.program-card > p {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #6a7a73;
+  min-height: 35px;
+}
+
+.program-card h3 {
+  font-size: 11px;
+  margin: 18px 0 8px;
+}
+
+.project-list {
+  display: grid;
+  gap: 5px;
+}
+
+.project {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  background: #f6f9f7;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.project span {
+  font-size: 9px;
+  text-transform: capitalize;
+  color: #648171;
+}
+
+.add-project {
+  margin-top: 11px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #087052;
+  font: 700 11px Manrope;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .program-form {
+    grid-template-columns: 1fr;
+  }
+
+  .program-form .button {
+    width: max-content;
+  }
+}
