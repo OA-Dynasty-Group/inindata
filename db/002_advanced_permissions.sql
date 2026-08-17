@@ -10,18 +10,26 @@ CREATE TABLE fieldwork.project_members (
   project_id uuid NOT NULL REFERENCES fieldwork.projects(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES fieldwork.users(id) ON DELETE CASCADE,
   role_id uuid NOT NULL REFERENCES fieldwork.roles(id) ON DELETE CASCADE,
-  permissions text[] DEFAULT '[]',
+  permissions text[] DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  UNIQUE(project_id, user_id),
-  CONSTRAINT project_role_tenancy CHECK (
-    -- role must belong to the same organization as project
-    EXISTS (
-      SELECT 1 FROM fieldwork.projects p
-      WHERE p.id = project_id AND p.organization_id = organization_id
-    )
-  )
+  UNIQUE(project_id, user_id)
 );
+
+CREATE OR REPLACE FUNCTION fieldwork.validate_project_member_tenancy() RETURNS trigger AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM fieldwork.projects p
+    WHERE p.id = NEW.project_id AND p.organization_id = NEW.organization_id
+  ) THEN
+    RAISE EXCEPTION 'Project does not belong to this organization';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER validate_project_members_tenancy BEFORE INSERT OR UPDATE ON fieldwork.project_members
+  FOR EACH ROW EXECUTE FUNCTION fieldwork.validate_project_member_tenancy();
 
 CREATE TRIGGER set_project_members_updated_at BEFORE UPDATE ON fieldwork.project_members
   FOR EACH ROW EXECUTE FUNCTION fieldwork.set_updated_at();
@@ -63,7 +71,7 @@ ALTER TABLE fieldwork.instruments
 
 -- Add field masking metadata to instruments
 ALTER TABLE fieldwork.instruments
-  ADD COLUMN IF NOT EXISTS pii_fields text[] DEFAULT '[]'; -- array of field keys that contain PII
+  ADD COLUMN IF NOT EXISTS pii_fields text[] DEFAULT '{}'; -- array of field keys that contain PII
 
 -- Track access logs for audit trail
 CREATE TABLE fieldwork.access_logs (

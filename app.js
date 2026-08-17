@@ -53,11 +53,13 @@ async function boot(){
     if (!response.ok) throw new Error('Not signed in');
     $('#loginOverlay').hidden = true;
     $('#signupOverlay').hidden = true;
+    $('#passwordResetOverlay').hidden = true;
     await loadForm();
     showPage();
   } catch {
     $('#loginOverlay').hidden = false;
     $('#signupOverlay').hidden = true;
+    $('#passwordResetOverlay').hidden = true;
   }
 }
 
