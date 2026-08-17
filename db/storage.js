@@ -9,8 +9,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 // Determine which backend to use
-const USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
-const USE_DATABASE = !!process.env.DATABASE_URL;
+let USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+let USE_DATABASE = !!process.env.DATABASE_URL;
 
 let db = null;
 let queries = null;
@@ -45,15 +45,22 @@ const USE_DB = USE_SUPABASE || USE_DATABASE;
 
 // File-based storage implementation
 const FileStore = (() => {
+  const isVercel = !!process.env.VERCEL;
   const ROOT = path.join(__dirname, '..');
-  const DATA_FILE = path.join(ROOT, 'data', 'store.json');
+  const DATA_DIR = isVercel ? path.join('/tmp', 'fieldwork-data') : path.join(ROOT, 'data');
+  const DATA_FILE = path.join(DATA_DIR, 'store.json');
   
   const load = () => {
     if (!fs.existsSync(DATA_FILE)) {
-      fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-      const data = initialData();
-      write(data);
-      return data;
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        const data = initialData();
+        write(data);
+        return data;
+      } catch (err) {
+        console.error('[Storage] Cannot write data file:', err.message);
+        return initialData();
+      }
     }
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     let changed = false;
@@ -70,7 +77,12 @@ const FileStore = (() => {
   };
   
   const write = (data) => {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error('[Storage] Cannot write data file:', err.message);
+    }
   };
   
   return { load, write };

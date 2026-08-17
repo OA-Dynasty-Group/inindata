@@ -115,8 +115,8 @@ function jsonCached(res, code, body, cacheKey, ttl = cache.TTL.ANALYTICS) {
 }
 
 const handler = async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`); const segments = url.pathname.split('/').filter(Boolean); const data = load();
   try {
+    const url = new URL(req.url, `http://${req.headers.host}`); const segments = url.pathname.split('/').filter(Boolean); const data = load();
     if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { status: 'ok' });
     if (req.method === 'GET' && url.pathname === '/api/health/db') {
       if (!storage.USE_DATABASE) {
