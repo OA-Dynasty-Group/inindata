@@ -3,7 +3,7 @@ const nodemailer = require('nodemailer');
 
 // Email provider configuration
 const PROVIDER = process.env.EMAIL_PROVIDER || 'titanmail';
-const ENABLED = !!process.env.EMAIL_ENABLED || process.env.TITANMAIL_HOST;
+let ENABLED = !!process.env.EMAIL_ENABLED || process.env.TITANMAIL_HOST;
 
 let transporter = null;
 let emailQueue = [];

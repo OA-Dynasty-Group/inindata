@@ -1,22 +1,17 @@
 {
   "version": 2,
   "name": "ngo-data-platform",
-  "env": {
-    "NODE_ENV": "production",
-    "FIELDWORK_PORT": "3000"
-  },
   "installCommand": "npm ci",
-  "framework": "node",
-  "functions": {
-    "server.js": {
-      "memory": 512,
-      "maxDuration": 30
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/server.js"
+      "dest": "server.js"
     }
   ]
 }
