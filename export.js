@@ -1,7 +1,5 @@
 // export.js - Export analytics as image, PDF, or CSV
 
-const toast = App.ui.toast;
-
 App.export = {};
 
 async function exportChartAsImage() {

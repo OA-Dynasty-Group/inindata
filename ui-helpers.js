@@ -23,6 +23,7 @@ App.ui = {
   }
 };
 
-// Also expose `safe` and `toast` as globals for backward compatibility
+// Also expose as globals for backward compatibility
 window.safe = App.ui.safe;
 window.toast = App.ui.toast;
+window.escapeHtml = App.ui.escapeHtml;

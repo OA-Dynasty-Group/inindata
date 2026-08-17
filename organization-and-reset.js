@@ -1,9 +1,6 @@
 // Organization and password reset management
 // This file handles Phase 3 flows: organization management and password reset
 
-const toast = App.ui.toast;
-const escapeHtml = App.ui.escapeHtml;
-
 App.org = {};
 
 App.state.passwordResetStep = 'email';
