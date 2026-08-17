@@ -27,5 +27,96 @@ async function loadInstruments(){const list=$('#instrumentList');try{const respo
 function showPage(){const target=location.hash.slice(1);const page=document.getElementById(target);document.querySelectorAll('main>.page').forEach(item=>item.hidden=item!==page);if(!page){$('#dashboard').hidden=false;loadDashboards()}if(target==='forms')loadInstruments();if(target==='responses')loadResponses();if(target==='datasets')loadDataset();if(target==='analytics')loadAnalytics();if(target==='programs')loadPrograms();if(target==='audit')loadAudit();if(target==='reports')loadReports();if(target==='users')loadUsers()}window.addEventListener('hashchange',showPage);document.querySelectorAll('.nav-link').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('.nav-link').forEach(x=>x.classList.remove('active'));a.classList.add('active')}));$('#refreshResponses').onclick=loadResponses;$('#refreshAudit').onclick=loadAudit;$('#datasetSearch').oninput=()=>activeDataset&&renderDataset();$('#dimensionSelect').onchange=loadAnalytics;$('#toggleProgramForm').onclick=()=>{$('#programForm').hidden=!$('#programForm').hidden};$('#toggleUserForm').onclick=()=>{$('#userForm').hidden=!$('#userForm').hidden};$('#saveDashboard').onclick=async()=>{const name=window.prompt('Name this dashboard view');if(!name?.trim())return;try{const response=await fetch('/api/dashboards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,instrumentId:form.id,dimension:$('#dimensionSelect').value})});const result=await response.json();if(!response.ok)throw new Error(result.error);toast('Dashboard saved.')}catch(error){toast(error.message)}};$('#newInstrument').onclick=async()=>{const name=window.prompt('Name your new form');if(!name?.trim())return;try{const response=await fetch('/api/instruments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const result=await response.json();if(!response.ok)throw new Error(result.error);form=result;toast('Draft form created.');location.hash='#builder'}catch(error){toast(error.message)}};$('#programForm').onsubmit=async event=>{event.preventDefault();try{const response=await fetch('/api/programs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('#programName').value,code:$('#programCode').value,description:$('#programDescription').value})});const result=await response.json();if(!response.ok)throw new Error(result.error);event.target.reset();event.target.hidden=true;toast('Program created.');loadPrograms()}catch(error){toast(error.message)}};$('#reportForm').onsubmit=async event=>{event.preventDefault();try{const response=await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('#reportTitle').value,instrumentId:form.id,dimension:$('#reportDimension').value,narrative:$('#reportNarrative').value})});const result=await response.json();if(!response.ok)throw new Error(result.error);event.target.reset();toast('Report saved.');loadReports()}catch(error){toast(error.message)}};$('#userForm').onsubmit=async event=>{event.preventDefault();try{const response=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('#userName').value,email:$('#userEmail').value,role:$('#userRole').value,password:$('#userPassword').value})});const result=await response.json();if(!response.ok)throw new Error(result.error);event.target.reset();event.target.hidden=true;toast('User added.');loadUsers()}catch(error){toast(error.message)}};
 function showImportResult(message,error=false){const box=$('#importResult');box.innerHTML=message;box.hidden=false;box.classList.toggle('error',error)}$('#openImport').onclick=()=>{const panel=$('#importPanel');panel.hidden=!panel.hidden};$('#previewImport').onclick=async()=>{const file=$('#csvFile').files[0];if(!file)return showImportResult('Choose a CSV file first.',true);try{importCsv=await file.text();const response=await fetch(`/api/instruments/${form.id}/dataset/import/preview`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv:importCsv})});const result=await response.json();if(!response.ok)throw new Error(result.error);const mapped=result.mapping.filter(column=>column.key).map(column=>`${safe(column.column)} → ${safe(column.label)}`).join('<br>')||'No columns were matched.';const issue=result.problems.length?`<br><strong>${result.problems.length} row(s) need attention.</strong> Rows: ${result.problems.slice(0,5).map(problem=>problem.row).join(', ')}`:'<br><strong>All rows are valid and ready to import.</strong>';showImportResult(`${result.totalRows} data rows · ${result.validRows} valid<br>${mapped}${issue}`,Boolean(result.problems.length));$('#confirmImport').hidden=Boolean(result.problems.length)}catch(error){$('#confirmImport').hidden=true;showImportResult(safe(error.message),true)}};$('#confirmImport').onclick=async()=>{try{const response=await fetch(`/api/instruments/${form.id}/dataset/import`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv:importCsv})});const result=await response.json();if(!response.ok)throw new Error(result.error);toast(`${result.imported} responses imported.`);$('#importPanel').hidden=true;$('#confirmImport').hidden=true;loadDataset()}catch(error){showImportResult(safe(error.message),true)}};
 async function loadForm(){const response=await fetch(`/api/instruments/${form.id}`);if(!response.ok)throw new Error('Could not load the form definition.');form=await response.json();render()}
-async function boot(){try{const response=await fetch('/api/me');if(!response.ok)throw new Error('Not signed in');$('#loginOverlay').hidden=true;await loadForm();showPage()}catch{$('#loginOverlay').hidden=false}}
-$('#loginForm').onsubmit=async event=>{event.preventDefault();const error=$('#loginError');error.hidden=true;try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#loginEmail').value,password:$('#loginPassword').value})});const result=await response.json();if(!response.ok)throw new Error(result.error);$('#loginOverlay').hidden=true;await loadForm()}catch(reason){error.textContent=reason.message;error.hidden=false}};boot();
+async function boot(){
+  // Check for password reset token in URL
+  const hash = location.hash;
+  if (hash.startsWith('#reset-password/')) {
+    const token = hash.replace('#reset-password/', '');
+    showPasswordResetForm(token);
+    return;
+  }
+
+  // Show signup or login based on hash
+  if (hash === '#signup') {
+    $('#loginOverlay').hidden = true;
+    $('#signupOverlay').hidden = false;
+    return;
+  }
+  if (hash === '#login') {
+    $('#loginOverlay').hidden = false;
+    $('#signupOverlay').hidden = true;
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/me');
+    if (!response.ok) throw new Error('Not signed in');
+    $('#loginOverlay').hidden = true;
+    $('#signupOverlay').hidden = true;
+    await loadForm();
+    showPage();
+  } catch {
+    $('#loginOverlay').hidden = false;
+    $('#signupOverlay').hidden = true;
+  }
+}
+
+// Login form handler
+$('#loginForm').onsubmit = async event => {
+  event.preventDefault();
+  const error = $('#loginError');
+  error.hidden = true;
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('#loginEmail').value, password: $('#loginPassword').value })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    $('#loginOverlay').hidden = true;
+    await loadForm();
+  } catch (reason) {
+    error.textContent = reason.message;
+    error.hidden = false;
+  }
+};
+
+// Signup form handler
+$('#signupForm').onsubmit = async event => {
+  event.preventDefault();
+  const error = $('#signupError');
+  error.hidden = true;
+  const password = $('#signupPassword').value;
+  const confirmPassword = $('#signupConfirmPassword').value;
+  if (password !== confirmPassword) {
+    error.textContent = 'Passwords do not match.';
+    error.hidden = false;
+    return;
+  }
+  try {
+    const response = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orgName: $('#signupOrgName').value,
+        email: $('#signupEmail').value,
+        password: password,
+        confirmPassword: confirmPassword
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    $('#signupOverlay').hidden = true;
+    await loadForm();
+  } catch (reason) {
+    error.textContent = reason.message;
+    error.hidden = false;
+  }
+};
+
+// Toggle between login and signup
+$('#showSignup').onclick = e => { e.preventDefault(); location.hash = '#signup'; };
+$('#showLogin').onclick = e => { e.preventDefault(); location.hash = '#login'; };
+
+boot();

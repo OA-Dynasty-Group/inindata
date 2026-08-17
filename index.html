@@ -29,12 +29,28 @@
         <a class="brand" href="#dashboard"><span class="brand-mark">f</span><span>fieldwork</span></a>
         <p class="eyebrow">COMMUNITY REACH</p>
         <h1>Welcome back</h1>
-        <p>Sign in to manage your organization’s data.</p>
+        <p>Sign in to manage your organization's data.</p>
         <label>Email<input id="loginEmail" type="email" autocomplete="email" required /></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
         <p class="login-error" id="loginError" hidden></p>
         <button class="button primary" type="submit">Sign in <span>→</span></button>
         <small><a href="#password-reset" class="text-button">Forgot your password?</a></small>
+        <small>Don't have an account? <a href="#signup" class="text-button" id="showSignup">Sign up</a></small>
+      </form>
+    </div>
+    <div class="signup-overlay" id="signupOverlay" hidden>
+      <form class="login-card" id="signupForm">
+        <a class="brand" href="#dashboard"><span class="brand-mark">f</span><span>fieldwork</span></a>
+        <p class="eyebrow">GET STARTED</p>
+        <h1>Create your organization</h1>
+        <p>Set up your organization and admin account to start collecting data.</p>
+        <label>Organization name<input id="signupOrgName" type="text" required minlength="2" placeholder="e.g. Community Reach" /></label>
+        <label>Admin email<input id="signupEmail" type="email" autocomplete="email" required placeholder="you@organization.org" /></label>
+        <label>Password<input id="signupPassword" type="password" autocomplete="new-password" required minlength="12" placeholder="At least 12 characters" /></label>
+        <label>Confirm password<input id="signupConfirmPassword" type="password" autocomplete="new-password" required minlength="12" /></label>
+        <p class="login-error" id="signupError" hidden></p>
+        <button class="button primary" type="submit">Create account <span>→</span></button>
+        <small>Already have an account? <a href="#login" class="text-button" id="showLogin">Sign in</a></small>
       </form>
     </div>
     <div class="password-reset-overlay" id="passwordResetOverlay" hidden>

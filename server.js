@@ -11,6 +11,9 @@ const ROLE_PERMISSIONS = storage.ROLE_PERMISSIONS;
 const passwordHash = storage.passwordHash;
 const passwordsMatch = storage.passwordsMatch;
 
+// Import Supabase Auth helpers
+const supabaseAuth = require('./db/supabase-client');
+
 // Import email service (optional, requires configuration)
 const email = require('./email/service');
 
@@ -37,8 +40,32 @@ function audit(data, action, resourceType, resourceId, metadata = {}) { data.aud
 function instrument(data, id) { return data.instruments.find(item => item.id === id); }
 function json(res, code, body) { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
 function cookie(req, name) { return (req.headers.cookie || '').split(';').map(v => v.trim().split('=')).find(([key]) => key === name)?.[1]; }
-function currentUser(req, data) { const id = sessions.get(cookie(req, 'fieldwork_session')); return data.users?.find(user => user.id === id && user.status === 'active'); }
-function authorized(req, data, permission) { const user = currentUser(req, data); return user && user.permissions.includes(permission) ? user : null; }
+async function currentUser(req, data) {
+  // Try Supabase JWT first
+  const jwt = supabaseAuth.parseAuthCookie(req.headers);
+  if (jwt) {
+    try {
+      const { user } = await supabaseAuth.getUser(jwt);
+      if (user) {
+        // Look up the fieldwork user by Supabase Auth user ID
+        const fwUser = data.users?.find(u => u.supabaseUserId === user.id && u.status === 'active');
+        if (fwUser) return fwUser;
+        // Fallback: try email match (for users created before Supabase Auth)
+        const byEmail = data.users?.find(u => u.email === user.email && u.status === 'active');
+        if (byEmail) {
+          byEmail.supabaseUserId = user.id;
+          return byEmail;
+        }
+      }
+    } catch (err) {
+      // JWT invalid or expired, fall through to local session
+    }
+  }
+  // Local session fallback (development mode)
+  const id = sessions.get(cookie(req, 'fieldwork_session'));
+  return data.users?.find(user => user.id === id && user.status === 'active');
+}
+async function authorized(req, data, permission) { const user = await currentUser(req, data); return user && user.permissions.includes(permission) ? user : null; }
 function unauthorized(res) { return json(res, 401, { error: 'Sign in is required to access this resource.' }); }
 function publicUser(user) { const { password, ...safe } = user; return safe; }
 function rolePermissions(role) { return ROLE_PERMISSIONS[role] || []; }
@@ -136,8 +163,8 @@ const handler = async (req, res) => {
       return json(res, health.status === 'ok' ? 200 : health.status === 'disabled' ? 200 : 503, health);
     }
     if (req.method === 'POST' && url.pathname === '/api/email/test') {
-      if (!authorized(req, data, 'user:write')) return unauthorized(res);
-      const user = currentUser(req, data);
+      if (!(await authorized(req, data, 'user:write'))) return unauthorized(res);
+      const user = await currentUser(req, data);
       const result = await email.sendEmail(
         user.email,
         'Test Email from Fieldwork',
@@ -146,25 +173,230 @@ const handler = async (req, res) => {
       );
       return json(res, result.status === 'sent' ? 200 : 503, result);
     }
-    if (req.method === 'POST' && url.pathname === '/api/auth/login') { const body = await readBody(req); const user = data.users?.find(item => item.email.toLowerCase() === String(body.email || '').toLowerCase() && item.status === 'active'); if (!user || !passwordsMatch(String(body.password || ''), user)) return json(res, 401, { error: 'The email or password is incorrect.' }); const token = crypto.randomBytes(32).toString('base64url'); sessions.set(token, user.id); res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Set-Cookie': `fieldwork_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800`, 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ user: publicUser(user) })); }
-    if (req.method === 'POST' && url.pathname === '/api/auth/logout') { const token = cookie(req, 'fieldwork_session'); if (token) sessions.delete(token); res.writeHead(204, { 'Set-Cookie': 'fieldwork_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' }); return res.end(); }
-    if (req.method === 'GET' && url.pathname === '/api/me') { const user = currentUser(req, data); return user ? json(res, 200, { user: publicUser(user) }) : unauthorized(res); }
-    if (req.method === 'POST' && url.pathname === '/api/auth/password-reset') { const body = await readBody(req); const userEmail = String(body.email || '').trim().toLowerCase(); if (!userEmail || !/^\S+@\S+\.\S+$/.test(userEmail)) return json(res, 422, { error: 'Provide a valid email address.' }); const user = data.users?.find(u => u.email === userEmail); if (!user) return json(res, 404, { error: 'No account found with this email address.' }); const resetToken = crypto.randomBytes(32).toString('base64url'); const resetTokenExpiry = Date.now() + 3600000; user.passwordResetToken = resetToken; user.passwordResetExpiry = resetTokenExpiry; audit(data, 'PASSWORD_RESET_REQUEST', 'user', user.id, { email: user.email }); write(data); const resetUrl = `${process.env.FIELDWORK_PUBLIC_URL || 'http://localhost:3000'}/reset-password/${resetToken}`; if (email.ENABLED) { email.sendEmail(user.email, email.templates.passwordReset(user.name, resetUrl).subject, email.templates.passwordReset(user.name, resetUrl).text, email.templates.passwordReset(user.name, resetUrl).html).catch(err => console.error('[Email] Failed to send password reset:', err.message)); } return json(res, 200, { message: 'Password reset instructions have been sent to your email.' }); }
-    if (req.method === 'POST' && url.pathname === '/api/auth/password-reset/confirm') { const body = await readBody(req); const token = String(body.token || '').trim(); const newPassword = String(body.password || '').trim(); if (newPassword.length < 12) return json(res, 422, { error: 'Password must be at least 12 characters.' }); const user = data.users?.find(u => u.passwordResetToken === token && u.passwordResetExpiry > Date.now()); if (!user) return json(res, 401, { error: 'Reset link is invalid or has expired.' }); user.password = passwordHash(newPassword); delete user.passwordResetToken; delete user.passwordResetExpiry; audit(data, 'PASSWORD_RESET_COMPLETE', 'user', user.id, {}); write(data); return json(res, 200, { message: 'Password has been reset successfully.' }); }
-    if (req.method === 'GET' && url.pathname === '/api/organization') { const user = currentUser(req, data); if (!user) return unauthorized(res); return json(res, 200, data.organization); }
-    if (req.method === 'PATCH' && url.pathname === '/api/organization') { if (!authorized(req, data, 'user:write')) return unauthorized(res); const body = await readBody(req); if (body.name?.trim()) { data.organization.name = body.name.trim(); audit(data, 'UPDATE', 'organization', data.organization.id, { name: data.organization.name }); write(data); } return json(res, 200, data.organization); }
-    if (req.method === 'GET' && url.pathname === '/api/users') { if (!authorized(req, data, 'user:read')) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.users.map(publicUser), { filters: params.filter, search: params.search, searchFields: ['name', 'email'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
-    if (req.method === 'POST' && url.pathname === '/api/users') { if (!authorized(req, data, 'user:write')) return unauthorized(res); const body = await readBody(req); const email = String(body.email || '').trim().toLowerCase(); const role = String(body.role || 'field_worker'); if (!body.name?.trim() || !/^\S+@\S+\.\S+$/.test(email) || String(body.password || '').length < 12 || !ROLE_PERMISSIONS[role]) return json(res, 422, { error: 'Provide a name, valid email, a password of at least 12 characters, and a valid role.' }); if (data.users.some(user => user.email === email)) return json(res, 409, { error: 'A user with this email already exists.' }); const user = { id: crypto.randomUUID(), name: body.name.trim(), email, status: 'active', roles: [role], permissions: rolePermissions(role), password: passwordHash(body.password) }; data.users.push(user); audit(data, 'CREATE', 'user', user.id, { email: user.email, role }); write(data); if (email.ENABLED) { email.sendEmail(user.email, 'Welcome to ' + data.organization.name, `Welcome ${user.name}! You have been added to ${data.organization.name}. Your initial password has been set.`, `<h2>Welcome to ${data.organization.name}</h2><p>Hello ${user.name},</p><p>You have been added to <strong>${data.organization.name}</strong>.</p><p>You can now sign in with:</p><ul><li><strong>Email:</strong> ${user.email}</li><li><strong>Password:</strong> The one provided to you</li></ul><p><a href="${process.env.FIELDWORK_PUBLIC_URL || 'http://localhost:3000'}" style="display:inline-block;padding:12px 20px;background:#0066cc;color:white;text-decoration:none;border-radius:4px;">Sign in to ${data.organization.name}</a></p>`).catch(err => console.error('[Email] Failed to send welcome email:', err.message)); } return json(res, 201, publicUser(user)); }
-    if (req.method === 'PATCH' && segments[0] === 'api' && segments[1] === 'users' && segments[2] && segments[3] === 'status') { if (!authorized(req, data, 'user:write')) return unauthorized(res); const user = data.users.find(item => item.id === segments[2]); const body = await readBody(req); if (!user) return json(res, 404, { error: 'User not found.' }); if (!['active', 'suspended', 'deactivated'].includes(body.status)) return json(res, 422, { error: 'Use active, suspended, or deactivated.' }); if (user.id === currentUser(req, data).id && body.status !== 'active') return json(res, 422, { error: 'You cannot disable your own account.' }); user.status = body.status; audit(data, 'UPDATE', 'user', user.id, { status: user.status }); write(data); return json(res, 200, publicUser(user)); }
-    if (req.method === 'GET' && url.pathname === '/api/programs') { if (!authorized(req, data, 'program:read')) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.programs, { filters: params.filter, search: params.search, searchFields: ['name', 'code', 'description'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
-    if (req.method === 'POST' && url.pathname === '/api/programs') { if (!authorized(req, data, 'program:write')) return unauthorized(res); const body = await readBody(req); if (!body.name?.trim()) return json(res, 422, { error: 'A program name is required.' }); const program = { id: crypto.randomUUID(), name: body.name.trim(), code: String(body.code || '').trim(), description: String(body.description || '').trim(), status: 'planned', projects: [] }; data.programs.push(program); audit(data, 'CREATE', 'program', program.id, { name: program.name }); write(data); return json(res, 201, program); }
-    if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'programs' && segments[2] && segments[3] === 'projects') { if (!authorized(req, data, 'program:write')) return unauthorized(res); const program = data.programs.find(item => item.id === segments[2]); if (!program) return json(res, 404, { error: 'Program not found.' }); const body = await readBody(req); if (!body.name?.trim()) return json(res, 422, { error: 'A project name is required.' }); const project = { id: crypto.randomUUID(), name: body.name.trim(), status: 'planned' }; program.projects.push(project); audit(data, 'CREATE', 'project', project.id, { programId: program.id, name: project.name }); write(data); return json(res, 201, project); }
-    if (req.method === 'GET' && url.pathname === '/api/reports') { if (!authorized(req, data, 'report:read')) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.reports, { filters: params.filter, search: params.search, searchFields: ['title', 'narrative'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
-    if (req.method === 'POST' && url.pathname === '/api/reports') { if (!authorized(req, data, 'report:write')) return unauthorized(res); const body = await readBody(req); const item = instrument(data, body.instrumentId); if (!body.title?.trim() || !item) return json(res, 422, { error: 'A report title and valid instrument are required.' }); const dataset = datasetFor(data, item); try { aggregateDataset(dataset, body.dimension); } catch (error) { return json(res, 422, { error: error.message }); } const report = { id: crypto.randomUUID(), title: body.title.trim(), instrumentId: item.id, dimension: body.dimension, narrative: String(body.narrative || '').trim(), createdAt: new Date().toISOString(), createdBy: currentUser(req, data).id }; data.reports.unshift(report); audit(data, 'CREATE', 'report', report.id, { title: report.title, instrumentId: item.id }); write(data); return json(res, 201, report); }
-    if (req.method === 'GET' && url.pathname === '/api/dashboards') { if (!authorized(req, data, 'dashboard:read')) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.dashboards, { filters: params.filter, search: params.search, searchFields: ['name'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
-    if (req.method === 'POST' && url.pathname === '/api/dashboards') { if (!authorized(req, data, 'dashboard:write')) return unauthorized(res); const body = await readBody(req); const item = instrument(data, body.instrumentId); if (!body.name?.trim() || !item) return json(res, 422, { error: 'A dashboard name and valid instrument are required.' }); const dataset = datasetFor(data, item); try { aggregateDataset(dataset, body.dimension); } catch (error) { return json(res, 422, { error: error.message }); } const dashboard = { id: crypto.randomUUID(), name: body.name.trim(), widgets: [{ type: 'bar', instrumentId: item.id, dimension: body.dimension, measure: 'response_count' }], createdAt: new Date().toISOString(), createdBy: currentUser(req, data).id }; data.dashboards.unshift(dashboard); audit(data, 'CREATE', 'dashboard', dashboard.id, { name: dashboard.name, instrumentId: item.id }); write(data); return json(res, 201, dashboard); }
+    if (req.method === 'POST' && url.pathname === '/api/auth/signup') {
+      const body = await readBody(req);
+      const orgName = String(body.orgName || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      const password = String(body.password || '').trim();
+      const confirmPassword = String(body.confirmPassword || '').trim();
+
+      if (!orgName || orgName.length < 2) return json(res, 422, { error: 'Organization name must be at least 2 characters.' });
+      if (!/^\S+@\S+\.\S+$/.test(email)) return json(res, 422, { error: 'Provide a valid email address.' });
+      if (password.length < 12) return json(res, 422, { error: 'Password must be at least 12 characters.' });
+      if (password !== confirmPassword) return json(res, 422, { error: 'Passwords do not match.' });
+
+      const existingUser = data.users?.find(u => u.email === email);
+      if (existingUser) return json(res, 409, { error: 'An account with this email already exists.' });
+
+      try {
+        if (storage.USE_SUPABASE) {
+          // Supabase Auth: create auth user
+          const authResult = await supabaseAuth.signUp(email, password, { orgName });
+          const authUser = authResult.user;
+
+          // Create organization
+          const org = { id: crypto.randomUUID(), name: orgName, createdAt: new Date().toISOString() };
+          if (!data.organization) {
+            data.organization = org;
+          } else {
+            // Multiple orgs supported via fieldwork schema
+          }
+
+          // Create user with Supabase Auth user ID
+          const user = {
+            id: crypto.randomUUID(),
+            supabaseUserId: authUser.id,
+            name: body.name?.trim() || email.split('@')[0],
+            email,
+            status: 'active',
+            roles: ['admin'],
+            permissions: ADMIN_PERMISSIONS,
+            createdAt: new Date().toISOString()
+          };
+          if (!data.users) data.users = [];
+          data.users.push(user);
+
+          // Create admin role assignment
+          const roleAssignment = { userId: user.id, role: 'admin', permissions: ADMIN_PERMISSIONS };
+          if (!data.roles) data.roles = {};
+          if (!data.roles.admin) data.roles.admin = { permissions: ADMIN_PERMISSIONS };
+          if (!data.userRoles) data.userRoles = [];
+          data.userRoles.push(roleAssignment);
+
+          audit(data, 'SIGNUP', 'user', user.id, { email: user.email, orgName });
+          write(data);
+
+          // Set JWT cookie
+          if (authResult.session) {
+            supabaseAuth.setAuthCookie(res, authResult.session.access_token);
+          }
+
+          return json(res, 201, { user: publicUser(user), message: 'Account created. Please check your email for verification.' });
+        } else {
+          // Fallback: local file-based auth
+          const user = {
+            id: crypto.randomUUID(),
+            name: body.name?.trim() || email.split('@')[0],
+            email,
+            status: 'active',
+            roles: ['admin'],
+            permissions: ADMIN_PERMISSIONS,
+            password: passwordHash(password),
+            createdAt: new Date().toISOString()
+          };
+          if (!data.users) data.users = [];
+          data.users.push(user);
+          audit(data, 'SIGNUP', 'user', user.id, { email: user.email, orgName });
+          write(data);
+
+          // Auto-login
+          const token = crypto.randomBytes(32).toString('base64url');
+          sessions.set(token, user.id);
+          res.writeHead(201, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Set-Cookie': `fieldwork_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800`,
+            'Cache-Control': 'no-store'
+          });
+          return res.end(JSON.stringify({ user: publicUser(user) }));
+        }
+      } catch (err) {
+        console.error('[Auth] Signup error:', err.message);
+        return json(res, 400, { error: err.message || 'Failed to create account.' });
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+      const body = await readBody(req);
+      const email = String(body.email || '').trim().toLowerCase();
+      const password = String(body.password || '').trim();
+
+      if (!email || !password) return json(res, 422, { error: 'Email and password are required.' });
+
+      try {
+        if (storage.USE_SUPABASE) {
+          // Supabase Auth login
+          const authResult = await supabaseAuth.signIn(email, password);
+          const authUser = authResult.user;
+
+          // Look up fieldwork user
+          let fwUser = data.users?.find(u => u.supabaseUserId === authUser.id && u.status === 'active');
+          if (!fwUser) fwUser = data.users?.find(u => u.email === authUser.email && u.status === 'active');
+          if (!fwUser) return json(res, 404, { error: 'User account not found in Fieldwork. Please contact your administrator.' });
+
+          // Link supabaseUserId if not already linked
+          if (!fwUser.supabaseUserId) fwUser.supabaseUserId = authUser.id;
+
+          // Set JWT cookie
+          supabaseAuth.setAuthCookie(res, authResult.session.access_token);
+
+          return json(res, 200, { user: publicUser(fwUser) });
+        } else {
+          // Fallback: local file-based auth
+          const user = data.users?.find(item => item.email.toLowerCase() === email && item.status === 'active');
+          if (!user || !passwordsMatch(password, user)) return json(res, 401, { error: 'The email or password is incorrect.' });
+          const token = crypto.randomBytes(32).toString('base64url');
+          sessions.set(token, user.id);
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Set-Cookie': `fieldwork_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800`,
+            'Cache-Control': 'no-store'
+          });
+          return res.end(JSON.stringify({ user: publicUser(user) }));
+        }
+      } catch (err) {
+        console.error('[Auth] Login error:', err.message);
+        return json(res, 401, { error: 'The email or password is incorrect.' });
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
+      try {
+        if (storage.USE_SUPABASE) {
+          const jwt = supabaseAuth.parseAuthCookie(req.headers);
+          if (jwt) await supabaseAuth.signOut(jwt);
+          supabaseAuth.clearAuthCookie(res);
+        } else {
+          const token = cookie(req, 'fieldwork_session');
+          if (token) sessions.delete(token);
+          res.writeHead(204, { 'Set-Cookie': 'fieldwork_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
+        }
+        return res.end();
+      } catch (err) {
+        return res.end();
+      }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/me') {
+      const user = await currentUser(req, data);
+      return user ? json(res, 200, { user: publicUser(user) }) : unauthorized(res);
+    }
+    if (req.method === 'POST' && url.pathname === '/api/auth/password-reset') {
+      const body = await readBody(req);
+      const userEmail = String(body.email || '').trim().toLowerCase();
+      if (!userEmail || !/^\S+@\S+\.\S+$/.test(userEmail)) return json(res, 422, { error: 'Provide a valid email address.' });
+
+      try {
+        if (storage.USE_SUPABASE) {
+          // Use Supabase Auth password reset
+          await supabaseAuth.resetPassword(userEmail);
+        } else {
+          // Fallback: local file-based password reset
+          const user = data.users?.find(u => u.email === userEmail);
+          if (!user) return json(res, 404, { error: 'No account found with this email address.' });
+          const resetToken = crypto.randomBytes(32).toString('base64url');
+          const resetTokenExpiry = Date.now() + 3600000;
+          user.passwordResetToken = resetToken;
+          user.passwordResetExpiry = resetTokenExpiry;
+          audit(data, 'PASSWORD_RESET_REQUEST', 'user', user.id, { email: user.email });
+          write(data);
+          const resetUrl = `${process.env.FIELDWORK_PUBLIC_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+          if (email.ENABLED) {
+            email.sendEmail(user.email, email.templates.passwordReset(user.name, resetUrl).subject, email.templates.passwordReset(user.name, resetUrl).text, email.templates.passwordReset(user.name, resetUrl).html).catch(err => console.error('[Email] Failed to send password reset:', err.message));
+          }
+        }
+        return json(res, 200, { message: 'Password reset instructions have been sent to your email.' });
+      } catch (err) {
+        // Always return success to prevent email enumeration
+        return json(res, 200, { message: 'Password reset instructions have been sent to your email.' });
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/auth/password-reset/confirm') {
+      const body = await readBody(req);
+      const token = String(body.token || '').trim();
+      const newPassword = String(body.password || '').trim();
+      if (newPassword.length < 12) return json(res, 422, { error: 'Password must be at least 12 characters.' });
+
+      try {
+        if (storage.USE_SUPABASE) {
+          // Use Supabase Auth password update with recovery token
+          await supabaseAuth.updateUserPassword(token, newPassword);
+          return json(res, 200, { message: 'Password has been reset successfully.' });
+        } else {
+          // Fallback: local file-based password reset
+          const user = data.users?.find(u => u.passwordResetToken === token && u.passwordResetExpiry > Date.now());
+          if (!user) return json(res, 401, { error: 'Reset link is invalid or has expired.' });
+          user.password = passwordHash(newPassword);
+          delete user.passwordResetToken;
+          delete user.passwordResetExpiry;
+          audit(data, 'PASSWORD_RESET_COMPLETE', 'user', user.id, {});
+          write(data);
+          return json(res, 200, { message: 'Password has been reset successfully.' });
+        }
+      } catch (err) {
+        return json(res, 401, { error: 'Reset link is invalid or has expired.' });
+      }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/organization') { const user = await currentUser(req, data); if (!user) return unauthorized(res); return json(res, 200, data.organization); }
+    if (req.method === 'PATCH' && url.pathname === '/api/organization') { if (!(await authorized(req, data, 'user:write'))) return unauthorized(res); const body = await readBody(req); if (body.name?.trim()) { data.organization.name = body.name.trim(); audit(data, 'UPDATE', 'organization', data.organization.id, { name: data.organization.name }); write(data); } return json(res, 200, data.organization); }
+    if (req.method === 'GET' && url.pathname === '/api/users') { if (!(await authorized(req, data, 'user:read'))) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.users.map(publicUser), { filters: params.filter, search: params.search, searchFields: ['name', 'email'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
+    if (req.method === 'POST' && url.pathname === '/api/users') { if (!(await authorized(req, data, 'user:write'))) return unauthorized(res); const body = await readBody(req); const email = String(body.email || '').trim().toLowerCase(); const role = String(body.role || 'field_worker'); if (!body.name?.trim() || !/^\S+@\S+\.\S+$/.test(email) || String(body.password || '').length < 12 || !ROLE_PERMISSIONS[role]) return json(res, 422, { error: 'Provide a name, valid email, a password of at least 12 characters, and a valid role.' }); if (data.users.some(user => user.email === email)) return json(res, 409, { error: 'A user with this email already exists.' }); const user = { id: crypto.randomUUID(), name: body.name.trim(), email, status: 'active', roles: [role], permissions: rolePermissions(role), password: passwordHash(body.password) }; data.users.push(user); audit(data, 'CREATE', 'user', user.id, { email: user.email, role }); write(data); if (email.ENABLED) { email.sendEmail(user.email, 'Welcome to ' + data.organization.name, `Welcome ${user.name}! You have been added to ${data.organization.name}. Your initial password has been set.`, `<h2>Welcome to ${data.organization.name}</h2><p>Hello ${user.name},</p><p>You have been added to <strong>${data.organization.name}</strong>.</p><p>You can now sign in with:</p><ul><li><strong>Email:</strong> ${user.email}</li><li><strong>Password:</strong> The one provided to you</li></ul><p><a href="${process.env.FIELDWORK_PUBLIC_URL || 'http://localhost:3000'}" style="display:inline-block;padding:12px 20px;background:#0066cc;color:white;text-decoration:none;border-radius:4px;">Sign in to ${data.organization.name}</a></p>`).catch(err => console.error('[Email] Failed to send welcome email:', err.message)); } return json(res, 201, publicUser(user)); }
+    if (req.method === 'PATCH' && segments[0] === 'api' && segments[1] === 'users' && segments[2] && segments[3] === 'status') { if (!(await authorized(req, data, 'user:write'))) return unauthorized(res); const user = data.users.find(item => item.id === segments[2]); const body = await readBody(req); if (!user) return json(res, 404, { error: 'User not found.' }); if (!['active', 'suspended', 'deactivated'].includes(body.status)) return json(res, 422, { error: 'Use active, suspended, or deactivated.' }); if (user.id === (await currentUser(req, data)).id && body.status !== 'active') return json(res, 422, { error: 'You cannot disable your own account.' }); user.status = body.status; audit(data, 'UPDATE', 'user', user.id, { status: user.status }); write(data); return json(res, 200, publicUser(user)); }
+    if (req.method === 'GET' && url.pathname === '/api/programs') { if (!(await authorized(req, data, 'program:read'))) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.programs, { filters: params.filter, search: params.search, searchFields: ['name', 'code', 'description'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
+    if (req.method === 'POST' && url.pathname === '/api/programs') { if (!(await authorized(req, data, 'program:write'))) return unauthorized(res); const body = await readBody(req); if (!body.name?.trim()) return json(res, 422, { error: 'A program name is required.' }); const program = { id: crypto.randomUUID(), name: body.name.trim(), code: String(body.code || '').trim(), description: String(body.description || '').trim(), status: 'planned', projects: [] }; data.programs.push(program); audit(data, 'CREATE', 'program', program.id, { name: program.name }); write(data); return json(res, 201, program); }
+    if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'programs' && segments[2] && segments[3] === 'projects') { if (!(await authorized(req, data, 'program:write'))) return unauthorized(res); const program = data.programs.find(item => item.id === segments[2]); if (!program) return json(res, 404, { error: 'Program not found.' }); const body = await readBody(req); if (!body.name?.trim()) return json(res, 422, { error: 'A project name is required.' }); const project = { id: crypto.randomUUID(), name: body.name.trim(), status: 'planned' }; program.projects.push(project); audit(data, 'CREATE', 'project', project.id, { programId: program.id, name: project.name }); write(data); return json(res, 201, project); }
+    if (req.method === 'GET' && url.pathname === '/api/reports') { if (!(await authorized(req, data, 'report:read'))) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.reports, { filters: params.filter, search: params.search, searchFields: ['title', 'narrative'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
+    if (req.method === 'POST' && url.pathname === '/api/reports') { if (!(await authorized(req, data, 'report:write'))) return unauthorized(res); const body = await readBody(req); const item = instrument(data, body.instrumentId); if (!body.title?.trim() || !item) return json(res, 422, { error: 'A report title and valid instrument are required.' }); const dataset = datasetFor(data, item); try { aggregateDataset(dataset, body.dimension); } catch (error) { return json(res, 422, { error: error.message }); } const reportUser = await currentUser(req, data); const report = { id: crypto.randomUUID(), title: body.title.trim(), instrumentId: item.id, dimension: body.dimension, narrative: String(body.narrative || '').trim(), createdAt: new Date().toISOString(), createdBy: reportUser.id }; data.reports.unshift(report); audit(data, 'CREATE', 'report', report.id, { title: report.title, instrumentId: item.id }); write(data); return json(res, 201, report); }
+    if (req.method === 'GET' && url.pathname === '/api/dashboards') { if (!(await authorized(req, data, 'dashboard:read'))) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.dashboards, { filters: params.filter, search: params.search, searchFields: ['name'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
+    if (req.method === 'POST' && url.pathname === '/api/dashboards') { if (!(await authorized(req, data, 'dashboard:write'))) return unauthorized(res); const body = await readBody(req); const item = instrument(data, body.instrumentId); if (!body.name?.trim() || !item) return json(res, 422, { error: 'A dashboard name and valid instrument are required.' }); const dataset = datasetFor(data, item); try { aggregateDataset(dataset, body.dimension); } catch (error) { return json(res, 422, { error: error.message }); } const dashUser = await currentUser(req, data); const dashboard = { id: crypto.randomUUID(), name: body.name.trim(), widgets: [{ type: 'bar', instrumentId: item.id, dimension: body.dimension, measure: 'response_count' }], createdAt: new Date().toISOString(), createdBy: dashUser.id }; data.dashboards.unshift(dashboard); audit(data, 'CREATE', 'dashboard', dashboard.id, { name: dashboard.name, instrumentId: item.id }); write(data); return json(res, 201, dashboard); }
     if (req.method === 'GET' && url.pathname === '/api/instruments') { 
-      if (!authorized(req, data, 'instrument:read')) return unauthorized(res); 
+      if (!(await authorized(req, data, 'instrument:read'))) return unauthorized(res); 
       
       // Check if using cursor-based pagination
       const params = new URL(req.url, 'http://localhost').searchParams;
@@ -194,17 +426,17 @@ const handler = async (req, res) => {
         return jsonCached(res, 200, cached, cacheKey, cache.TTL.INSTRUMENTS);
       }
     }
-    if (req.method === 'POST' && url.pathname === '/api/instruments') { if (!authorized(req, data, 'instrument:write')) return unauthorized(res); const body = await readBody(req); if (!body.name?.trim()) return json(res, 422, { error: 'An instrument name is required.' }); if (body.programId && !data.programs.find(program => program.id === body.programId)) return json(res, 422, { error: 'Choose a valid program.' }); const item = { id: crypto.randomUUID(), name: body.name.trim(), programId: body.programId || data.programs[0]?.id || null, status: 'draft', version: 0, collectionToken: null, updatedAt: new Date().toISOString(), sections: [{ id: crypto.randomUUID(), title: 'Section 1', description: '', questions: [] }], versions: [] }; data.instruments.push(item); audit(data, 'CREATE', 'instrument', item.id, { name: item.name, programId: item.programId }); write(data); cache.invalidateInstrumentCache(); cache.invalidateAnalyticsCache(); return json(res, 201, safeInstrument(item)); }
+    if (req.method === 'POST' && url.pathname === '/api/instruments') { if (!(await authorized(req, data, 'instrument:write'))) return unauthorized(res); const body = await readBody(req); if (!body.name?.trim()) return json(res, 422, { error: 'An instrument name is required.' }); if (body.programId && !data.programs.find(program => program.id === body.programId)) return json(res, 422, { error: 'Choose a valid program.' }); const item = { id: crypto.randomUUID(), name: body.name.trim(), programId: body.programId || data.programs[0]?.id || null, status: 'draft', version: 0, collectionToken: null, updatedAt: new Date().toISOString(), sections: [{ id: crypto.randomUUID(), title: 'Section 1', description: '', questions: [] }], versions: [] }; data.instruments.push(item); audit(data, 'CREATE', 'instrument', item.id, { name: item.name, programId: item.programId }); write(data); cache.invalidateInstrumentCache(); cache.invalidateAnalyticsCache(); return json(res, 201, safeInstrument(item)); }
     if (segments[0] === 'api' && segments[1] === 'instruments' && segments[2]) {
       const item = instrument(data, segments[2]); if (!item) return json(res, 404, { error: 'Instrument not found.' });
-      if (req.method === 'GET' && segments.length === 3) { if (!authorized(req, data, 'instrument:read')) return unauthorized(res); return json(res, 200, safeInstrument(item)); }
-      if (req.method === 'PUT' && segments.length === 3) { if (!authorized(req, data, 'instrument:write')) return unauthorized(res); if (item.status === 'published') return json(res, 409, { error: 'Published instruments are immutable. Create a new draft version.' }); const body = await readBody(req); const errors = validateDefinition(body); if (errors.length) return json(res, 422, { errors }); item.name = body.name.trim(); item.sections = body.sections; item.updatedAt = new Date().toISOString(); audit(data, 'UPDATE', 'instrument', item.id, { change: 'draft definition' }); write(data); cache.invalidateInstrumentCache(item.id); cache.invalidateAnalyticsCache(item.id); return json(res, 200, safeInstrument(item)); }
-      if (req.method === 'POST' && segments[3] === 'publish') { if (!authorized(req, data, 'instrument:publish')) return unauthorized(res); const errors = validateDefinition(item); if (errors.length) return json(res, 422, { errors }); const published = { id: crypto.randomUUID(), version: item.version + 1, publishedAt: new Date().toISOString(), sections: structuredClone(item.sections) }; item.versions.push(published); item.version = published.version; item.status = 'published'; item.collectionToken ||= crypto.randomBytes(18).toString('base64url'); item.updatedAt = published.publishedAt; audit(data, 'PUBLISH', 'instrument', item.id, { version: item.version }); write(data); cache.invalidateInstrumentCache(item.id); cache.invalidateAnalyticsCache(item.id); return json(res, 201, { instrument: safeInstrument(item), collectionUrl: `/collect/${item.collectionToken}` }); }
-      if (req.method === 'GET' && segments[3] === 'submissions') { if (!authorized(req, data, 'instrument:read')) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const submissions = data.submissions.filter(s => s.instrumentId === item.id).map(({ answers, ...submission }) => ({ ...submission, answerCount: Object.keys(answers).length })); const result = pagination.applyQuery(submissions, { filters: params.filter, search: params.search, searchFields: ['id', 'status'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
-      if (req.method === 'GET' && segments[3] === 'dataset') { if (!authorized(req, data, 'instrument:read')) return unauthorized(res); const dataset = datasetFor(data, item); if (segments[4] === 'export') { const user = authorized(req, data, 'dataset:export'); if (!user) return unauthorized(res); const headers = ['Response ID', 'Status', 'Submitted at', 'Instrument version', ...dataset.columns.map(column => column.label)]; const lines = [headers.map(csvValue).join(','), ...dataset.records.map(record => [record.id, record.status, record.submittedAt, record.instrumentVersion, ...dataset.columns.map(column => record.answers[column.key])].map(csvValue).join(','))]; audit(data, 'EXPORT', 'dataset', dataset.id, { format: 'csv', recordCount: dataset.records.length, userId: user.id }); write(data); res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-responses.csv"`, 'Cache-Control': 'no-store' }); return res.end(lines.join('\n')); } return json(res, 200, dataset); }
-      if (req.method === 'GET' && segments[3] === 'analytics') { if (!authorized(req, data, 'analytics:read')) return unauthorized(res); const dataset = datasetFor(data, item); const dimension = url.searchParams.get('dimension') || dataset.columns[0]?.key; if (!dimension) return json(res, 422, { error: 'This dataset has no fields to analyze.' }); const dateRange = url.searchParams.get('dateRange'); let fromDate = null, toDate = new Date(); if (dateRange && dateRange !== 'all') { const days = parseInt(dateRange); if (days > 0) { fromDate = new Date(toDate.getTime() - days * 86400000); } } const filteredDataset = fromDate ? { ...dataset, records: dataset.records.filter(record => new Date(record.submittedAt) >= fromDate) } : dataset; return json(res, 200, aggregateDataset(filteredDataset, dimension)); }
-      if (req.method === 'POST' && segments[3] === 'dataset' && segments[4] === 'import' && segments[5] === 'preview') { if (!authorized(req, data, 'dataset:import')) return unauthorized(res); const body = await readBody(req); try { return json(res, 200, getImportPreview(item, body)); } catch (error) { return json(res, 422, { error: error.message }); } }
-      if (req.method === 'POST' && segments[3] === 'dataset' && segments[4] === 'import') { if (!authorized(req, data, 'dataset:import')) return unauthorized(res); const body = await readBody(req); let preview; try { preview = getImportPreview(item, body); } catch (error) { return json(res, 422, { error: error.message }); } if (preview.problems.length) return json(res, 422, { error: 'Fix the import validation issues before importing.', problems: preview.problems }); const importedAt = new Date().toISOString(); const version = item.versions.at(-1)?.version || 0; preview.records.forEach(answers => data.submissions.push({ id: crypto.randomUUID(), instrumentId: item.id, instrumentVersion: version, status: 'submitted', source: 'import', answers, submittedAt: importedAt })); audit(data, 'IMPORT', 'dataset', `dataset-${item.id}`, { format: body.workbook ? 'xlsx' : 'csv', recordCount: preview.records.length }); write(data); return json(res, 201, { imported: preview.records.length }); }
+      if (req.method === 'GET' && segments.length === 3) { if (!(await authorized(req, data, 'instrument:read'))) return unauthorized(res); return json(res, 200, safeInstrument(item)); }
+      if (req.method === 'PUT' && segments.length === 3) { if (!(await authorized(req, data, 'instrument:write'))) return unauthorized(res); if (item.status === 'published') return json(res, 409, { error: 'Published instruments are immutable. Create a new draft version.' }); const body = await readBody(req); const errors = validateDefinition(body); if (errors.length) return json(res, 422, { errors }); item.name = body.name.trim(); item.sections = body.sections; item.updatedAt = new Date().toISOString(); audit(data, 'UPDATE', 'instrument', item.id, { change: 'draft definition' }); write(data); cache.invalidateInstrumentCache(item.id); cache.invalidateAnalyticsCache(item.id); return json(res, 200, safeInstrument(item)); }
+      if (req.method === 'POST' && segments[3] === 'publish') { if (!(await authorized(req, data, 'instrument:publish'))) return unauthorized(res); const errors = validateDefinition(item); if (errors.length) return json(res, 422, { errors }); const published = { id: crypto.randomUUID(), version: item.version + 1, publishedAt: new Date().toISOString(), sections: structuredClone(item.sections) }; item.versions.push(published); item.version = published.version; item.status = 'published'; item.collectionToken ||= crypto.randomBytes(18).toString('base64url'); item.updatedAt = published.publishedAt; audit(data, 'PUBLISH', 'instrument', item.id, { version: item.version }); write(data); cache.invalidateInstrumentCache(item.id); cache.invalidateAnalyticsCache(item.id); return json(res, 201, { instrument: safeInstrument(item), collectionUrl: `/collect/${item.collectionToken}` }); }
+      if (req.method === 'GET' && segments[3] === 'submissions') { if (!(await authorized(req, data, 'instrument:read'))) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const submissions = data.submissions.filter(s => s.instrumentId === item.id).map(({ answers, ...submission }) => ({ ...submission, answerCount: Object.keys(answers).length })); const result = pagination.applyQuery(submissions, { filters: params.filter, search: params.search, searchFields: ['id', 'status'], sort: params.sort, page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
+      if (req.method === 'GET' && segments[3] === 'dataset') { if (!(await authorized(req, data, 'instrument:read'))) return unauthorized(res); const dataset = datasetFor(data, item); if (segments[4] === 'export') { const user = authorized(req, data, 'dataset:export'); if (!user) return unauthorized(res); const headers = ['Response ID', 'Status', 'Submitted at', 'Instrument version', ...dataset.columns.map(column => column.label)]; const lines = [headers.map(csvValue).join(','), ...dataset.records.map(record => [record.id, record.status, record.submittedAt, record.instrumentVersion, ...dataset.columns.map(column => record.answers[column.key])].map(csvValue).join(','))]; audit(data, 'EXPORT', 'dataset', dataset.id, { format: 'csv', recordCount: dataset.records.length, userId: user.id }); write(data); res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-responses.csv"`, 'Cache-Control': 'no-store' }); return res.end(lines.join('\n')); } return json(res, 200, dataset); }
+      if (req.method === 'GET' && segments[3] === 'analytics') { if (!(await authorized(req, data, 'analytics:read'))) return unauthorized(res); const dataset = datasetFor(data, item); const dimension = url.searchParams.get('dimension') || dataset.columns[0]?.key; if (!dimension) return json(res, 422, { error: 'This dataset has no fields to analyze.' }); const dateRange = url.searchParams.get('dateRange'); let fromDate = null, toDate = new Date(); if (dateRange && dateRange !== 'all') { const days = parseInt(dateRange); if (days > 0) { fromDate = new Date(toDate.getTime() - days * 86400000); } } const filteredDataset = fromDate ? { ...dataset, records: dataset.records.filter(record => new Date(record.submittedAt) >= fromDate) } : dataset; return json(res, 200, aggregateDataset(filteredDataset, dimension)); }
+      if (req.method === 'POST' && segments[3] === 'dataset' && segments[4] === 'import' && segments[5] === 'preview') { if (!(await authorized(req, data, 'dataset:import'))) return unauthorized(res); const body = await readBody(req); try { return json(res, 200, getImportPreview(item, body)); } catch (error) { return json(res, 422, { error: error.message }); } }
+      if (req.method === 'POST' && segments[3] === 'dataset' && segments[4] === 'import') { if (!(await authorized(req, data, 'dataset:import'))) return unauthorized(res); const body = await readBody(req); let preview; try { preview = getImportPreview(item, body); } catch (error) { return json(res, 422, { error: error.message }); } if (preview.problems.length) return json(res, 422, { error: 'Fix the import validation issues before importing.', problems: preview.problems }); const importedAt = new Date().toISOString(); const version = item.versions.at(-1)?.version || 0; preview.records.forEach(answers => data.submissions.push({ id: crypto.randomUUID(), instrumentId: item.id, instrumentVersion: version, status: 'submitted', source: 'import', answers, submittedAt: importedAt })); audit(data, 'IMPORT', 'dataset', `dataset-${item.id}`, { format: body.workbook ? 'xlsx' : 'csv', recordCount: preview.records.length }); write(data); return json(res, 201, { imported: preview.records.length }); }
     }
     if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'collect' && segments[2]) { const item = data.instruments.find(x => x.collectionToken === segments[2] && x.status === 'published'); if (!item) return json(res, 404, { error: 'This collection link is unavailable.' }); const version = item.versions.at(-1); return json(res, 200, { instrumentId: item.id, name: item.name, version: version.version, sections: version.sections }); }
     if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'collect' && segments[2] && segments[3] === 'submissions') { 
@@ -233,7 +465,7 @@ const handler = async (req, res) => {
       return json(res, 201, { id: submission.id, status: submission.status }); 
     }
     if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'submissions' && segments[2] && segments[3] === 'review') { 
-      if (!authorized(req, data, 'submission:review')) return unauthorized(res); 
+      if (!(await authorized(req, data, 'submission:review'))) return unauthorized(res); 
       const submission = data.submissions.find(s => s.id === segments[2]); 
       if (!submission) return json(res, 404, { error: 'Submission not found.' }); 
       const body = await readBody(req); 
@@ -241,7 +473,7 @@ const handler = async (req, res) => {
       if (!canReviewTransition(submission.status, body.status)) return json(res, 409, { error: `A ${submission.status} response cannot move to ${body.status}.` }); 
       submission.status = body.status; 
       submission.reviewedAt = new Date().toISOString(); 
-      submission.reviewedBy = currentUser(req, data).id; 
+      submission.reviewedBy = (await currentUser(req, data)).id;
       audit(data, body.status.toUpperCase(), 'submission', submission.id, { instrumentId: submission.instrumentId }); 
       write(data); 
       
@@ -258,11 +490,11 @@ const handler = async (req, res) => {
       
       return json(res, 200, { id: submission.id, status: submission.status }); 
     }
-    if (req.method === 'GET' && url.pathname === '/api/audit-logs') { if (!authorized(req, data, 'audit:read')) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.auditLogs, { filters: params.filter, search: params.search, searchFields: ['action', 'resourceType'], sort: params.sort || '-timestamp', page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
+    if (req.method === 'GET' && url.pathname === '/api/audit-logs') { if (!(await authorized(req, data, 'audit:read'))) return unauthorized(res); const params = pagination.parsePaginationParams(req.url); const result = pagination.applyQuery(data.auditLogs, { filters: params.filter, search: params.search, searchFields: ['action', 'resourceType'], sort: params.sort || '-timestamp', page: params.page, limit: params.limit }); return json(res, 200, pagination.formatResponse(result)); }
     
     // Phase 4: Advanced Permissions - Project Members
     if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'projects' && segments[2] && segments[3] === 'members') {
-      if (!authorized(req, data, 'project:manage')) return unauthorized(res);
+      if (!(await authorized(req, data, 'project:manage'))) return unauthorized(res);
       const projectId = segments[2];
       const project = data.projects?.find(p => p.id === projectId);
       if (!project) return json(res, 404, { error: 'Project not found' });
@@ -270,7 +502,7 @@ const handler = async (req, res) => {
     }
     
     if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'projects' && segments[2] && segments[3] === 'members') {
-      if (!authorized(req, data, 'project:manage')) return unauthorized(res);
+      if (!(await authorized(req, data, 'project:manage'))) return unauthorized(res);
       const body = await readBody(req);
       const projectId = segments[2];
       const project = data.projects?.find(p => p.id === projectId);
@@ -287,7 +519,7 @@ const handler = async (req, res) => {
     
     // Phase 4: Advanced Permissions - Field Access
     if (req.method === 'GET' && segments[0] === 'api' && segments[1] === 'instruments' && segments[2] && segments[3] === 'field-access') {
-      if (!authorized(req, data, 'instrument:read')) return unauthorized(res);
+      if (!(await authorized(req, data, 'instrument:read'))) return unauthorized(res);
       const instrumentId = segments[2];
       const instrument = data.instruments?.find(i => i.id === instrumentId);
       if (!instrument) return json(res, 404, { error: 'Instrument not found' });
@@ -295,7 +527,7 @@ const handler = async (req, res) => {
     }
     
     if (req.method === 'POST' && segments[0] === 'api' && segments[1] === 'instruments' && segments[2] && segments[3] === 'field-access') {
-      if (!authorized(req, data, 'instrument:write')) return unauthorized(res);
+      if (!(await authorized(req, data, 'instrument:write'))) return unauthorized(res);
       const body = await readBody(req);
       const instrumentId = segments[2];
       const instrument = data.instruments?.find(i => i.id === instrumentId);

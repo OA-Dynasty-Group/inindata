@@ -54,15 +54,54 @@ document.getElementById('editOrganization').onclick = () => {
  * Password reset flow
  */
 let passwordResetStep = 'email'; // email -> confirm -> reset
+let passwordResetToken = null;
 
-function showPasswordResetForm() {
+/**
+ * Show password reset form, optionally with a token from email link
+ * @param {string} [token] - Recovery token from Supabase Auth email link
+ */
+function showPasswordResetForm(token) {
   document.getElementById('loginOverlay').hidden = true;
+  document.getElementById('signupOverlay').hidden = true;
   document.getElementById('passwordResetOverlay').hidden = false;
-  document.getElementById('resetEmail').focus();
+
+  if (token) {
+    // Token from email link — skip to password entry
+    passwordResetToken = token;
+    passwordResetStep = 'reset';
+    document.getElementById('resetTitle').textContent = 'Set your new password';
+    document.getElementById('resetDescription').textContent = 'Enter your new password below.';
+    document.getElementById('resetEmailLabel').hidden = true;
+    document.getElementById('resetTokenLabel').hidden = true;
+    document.getElementById('resetPasswordLabel').hidden = false;
+    document.getElementById('resetPasswordConfirmLabel').hidden = false;
+    document.getElementById('resetPassword').value = '';
+    document.getElementById('resetPasswordConfirm').value = '';
+    document.getElementById('resetButton').textContent = 'Reset password';
+    document.getElementById('resetButton').onclick = null;
+    document.getElementById('resetError').hidden = true;
+    document.getElementById('resetPassword').focus();
+  } else {
+    // No token — start from email entry
+    passwordResetToken = null;
+    passwordResetStep = 'email';
+    document.getElementById('resetTitle').textContent = 'Reset your password';
+    document.getElementById('resetDescription').textContent = 'Enter your email to receive a password reset link.';
+    document.getElementById('resetEmailLabel').hidden = false;
+    document.getElementById('resetTokenLabel').hidden = true;
+    document.getElementById('resetPasswordLabel').hidden = true;
+    document.getElementById('resetPasswordConfirmLabel').hidden = true;
+    document.getElementById('resetButton').textContent = 'Send reset link';
+    document.getElementById('resetButton').onclick = null;
+    document.getElementById('resetError').hidden = true;
+    document.getElementById('passwordResetForm').reset();
+    document.getElementById('resetEmail').focus();
+  }
 }
 
 function showLoginForm() {
   document.getElementById('passwordResetOverlay').hidden = true;
+  document.getElementById('signupOverlay').hidden = true;
   document.getElementById('loginOverlay').hidden = false;
   document.getElementById('loginEmail').focus();
 }
@@ -104,7 +143,7 @@ document.getElementById('passwordResetForm').onsubmit = async (event) => {
       error.className = 'login-info';
     } else if (passwordResetStep === 'reset') {
       // Step 2: Confirm password reset
-      const token = document.getElementById('resetToken').value.trim();
+      const token = passwordResetToken || document.getElementById('resetToken').value.trim();
       const password = document.getElementById('resetPassword').value;
       const confirm = document.getElementById('resetPasswordConfirm').value;
 
@@ -124,9 +163,10 @@ document.getElementById('passwordResetForm').onsubmit = async (event) => {
       // Success
       document.getElementById('resetTitle').textContent = 'Password reset successful!';
       document.getElementById('resetDescription').textContent = 'Your password has been updated. You can now sign in with your new password.';
-      document.getElementById('resetForm').reset();
+      document.getElementById('passwordResetForm').reset();
       document.getElementById('resetButton').textContent = 'Return to sign in';
       document.getElementById('resetButton').onclick = () => showLoginForm();
+      passwordResetToken = null;
     }
   } catch (reason) {
     error.textContent = reason.message;
@@ -139,21 +179,18 @@ document.getElementById('passwordResetForm').onsubmit = async (event) => {
  * Handle browser back button for password reset
  */
 window.addEventListener('hashchange', () => {
-  if (location.hash === '#password-reset') {
-    passwordResetStep = 'email';
-    document.getElementById('resetTitle').textContent = 'Reset your password';
-    document.getElementById('resetDescription').textContent = 'Enter your email to receive a password reset link.';
-    document.getElementById('resetEmailLabel').hidden = false;
-    document.getElementById('resetTokenLabel').hidden = true;
-    document.getElementById('resetPasswordLabel').hidden = true;
-    document.getElementById('resetPasswordConfirmLabel').hidden = true;
-    document.getElementById('resetButton').textContent = 'Send reset link';
-    document.getElementById('resetButton').onclick = null;
-    document.getElementById('resetError').hidden = true;
-    document.getElementById('passwordResetForm').reset();
+  const hash = location.hash;
+  if (hash === '#password-reset') {
     showPasswordResetForm();
-  } else if (location.hash === '#login' || location.hash === '') {
+  } else if (hash.startsWith('#reset-password/')) {
+    const token = hash.replace('#reset-password/', '');
+    showPasswordResetForm(token);
+  } else if (hash === '#login' || hash === '') {
     showLoginForm();
+  } else if (hash === '#signup') {
+    document.getElementById('loginOverlay').hidden = true;
+    document.getElementById('passwordResetOverlay').hidden = true;
+    document.getElementById('signupOverlay').hidden = false;
   }
 });
 
