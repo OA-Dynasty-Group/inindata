@@ -16,7 +16,8 @@ async function loadOrganization() {
     App.$('#organizationName').value = org.name;
 
     const usersResponse = await fetch('/api/users');
-    const users = await usersResponse.json();
+    const usersPayload = await usersResponse.json();
+    const users = Array.isArray(usersPayload) ? usersPayload : (usersPayload.items || []);
     App.$('#memberCount').innerHTML = `<strong>${users.length}</strong> team members`;
   } catch (error) {
     App.$('#organizationDisplay').innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;

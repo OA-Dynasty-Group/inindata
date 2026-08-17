@@ -5,6 +5,13 @@ const $ = App.$;
 const safe = App.ui.safe;
 const toast = App.ui.toast;
 
+function toItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.items)) return payload.items;
+  if (payload && Array.isArray(payload.data)) return payload.data;
+  return [];
+}
+
 let saveTimer;
 let routerInitialized = false;
 
@@ -93,7 +100,6 @@ function settings() {
   document.querySelectorAll('[data-option]').forEach(input => input.oninput = e => {
     q.options[+e.target.dataset.option] = e.target.value;
     save();
-    render();
   });
   document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
     q.options.splice(+b.dataset.remove, 1);
@@ -147,13 +153,11 @@ $('#formName').oninput = e => {
 $('#questionLabel').oninput = e => {
   question().label = e.target.value;
   save();
-  render();
 };
 
 $('#helpText').oninput = e => {
   question().help = e.target.value;
   save();
-  render();
 };
 
 $('#requiredInput').onchange = e => {
@@ -225,9 +229,11 @@ async function loadResponses() {
   const list = $('#responseList');
   try {
     const response = await fetch(`/api/instruments/${state.form.id}/submissions`);
-    const records = await response.json();
-    if (!response.ok) throw new Error(records.error);
-    $('#responseCount').textContent = records.length;
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const records = toItems(payload);
+    $('#responseCount').textContent = String(records.length)
+    $('#responseCount').textContent = String(records.length);
     list.innerHTML = records.length ? records.map(record =>
       `<div class="response-row"><div><strong>${record.id.slice(0, 8).toUpperCase()}</strong><small>Submitted ${new Date(record.submittedAt).toLocaleString()} \u00B7 Version ${record.instrumentVersion} \u00B7 ${record.answerCount} answers</small></div><span class="response-status">${record.status}</span>${record.status === 'submitted' ? `<button data-review="approved" data-id="${record.id}">Approve</button><button class="reject" data-review="rejected" data-id="${record.id}">Reject</button>` : record.status === 'approved' ? `<button data-review="locked" data-id="${record.id}">Lock</button>` : ''}</div>`
     ).join('') : '<p class="response-empty">No responses have been submitted yet.</p>';
@@ -307,10 +313,11 @@ async function loadAnalytics() {
 async function loadDashboards() {
   try {
     const response = await fetch('/api/dashboards');
-    const dashboards = await response.json();
-    if (!response.ok) throw new Error(dashboards.error);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const dashboards = toItems(payload);
     $('#dashboardList').innerHTML = dashboards.length ? dashboards.map(dashboard =>
-      `<article class="dashboard-item"><strong>${safe(dashboard.name)}</strong><small>Response count by ${safe(dashboard.widgets[0].dimension)}</small></article>`
+      `<article class="dashboard-item"><strong>${safe(dashboard.name)}</strong><small>Response count by ${safe(((dashboard.widgets || [])[0] || {}).dimension || 'response')}</small></article>`
     ).join('') : '<p class="dashboard-empty">No saved dashboards yet. Create one from Analytics.</p>';
   } catch (error) {
     $('#dashboardList').innerHTML = `<p class="dashboard-empty">${safe(error.message)}</p>`;
@@ -321,10 +328,11 @@ async function loadPrograms() {
   const list = $('#programList');
   try {
     const response = await fetch('/api/programs');
-    const programs = await response.json();
-    if (!response.ok) throw new Error(programs.error);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const programs = toItems(payload);
     list.innerHTML = programs.map(program =>
-      `<article class="program-card"><span class="code">${safe(program.code || 'PROGRAM')}</span><h2>${safe(program.name)}</h2><p>${safe(program.description || 'No description yet.')}</p><h3>Projects \u00B7 ${program.projects.length}</h3><div class="project-list">${program.projects.map(project =>
+      `<article class="program-card"><span class="code">${safe(program.code || 'PROGRAM')}</span><h2>${safe(program.name)}</h2><p>${safe(program.description || 'No description yet.')}</p><h3>Projects \u00B7 ${(program.projects || []).length}</h3><div class="project-list">${(program.projects || []).map(project =>
         `<div class="project"><span>${safe(project.name)}</span><span>${safe(project.status)}</span></div>`
       ).join('')}</div><button class="add-project" data-program="${program.id}">\uff0b Add project</button></article>`
     ).join('') || '<p>No programs have been created yet.</p>';
@@ -350,8 +358,9 @@ async function loadAudit() {
   const list = $('#auditList');
   try {
     const response = await fetch('/api/audit-logs');
-    const events = await response.json();
-    if (!response.ok) throw new Error(events.error);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const events = toItems(payload);
     list.innerHTML = events.length ? events.map(event =>
       `<article class="audit-row"><span class="audit-action">${safe(event.action)}</span><div class="audit-detail"><strong>${safe(event.resourceType)} \u00B7 ${safe(event.resourceId)}</strong><small>${safe(event.actor)}${event.metadata?.name ? ` \u00B7 ${safe(event.metadata.name)}` : ''}</small></div><time class="audit-time">${safe(new Date(event.timestamp).toLocaleString())}</time></article>`
     ).join('') : '<p class="audit-empty">No audit events have been recorded yet.</p>';
@@ -373,8 +382,9 @@ async function loadReports() {
       ).join('');
     }
     const response = await fetch('/api/reports');
-    const reports = await response.json();
-    if (!response.ok) throw new Error(reports.error);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const reports = toItems(payload);
     $('#reportList').innerHTML = reports.length ? reports.map(report =>
       `<article class="report-card"><p class="eyebrow">SAVED REPORT</p><h2>${safe(report.title)}</h2><p>${safe(report.narrative || 'No narrative added.')}</p><small>${safe(report.dimension)} \u00B7 ${safe(new Date(report.createdAt).toLocaleDateString())}</small></article>`
     ).join('') : '<p>No reports saved yet. Create your first reusable report above.</p>';
@@ -387,10 +397,11 @@ async function loadUsers() {
   const list = $('#userList');
   try {
     const response = await fetch('/api/users');
-    const users = await response.json();
-    if (!response.ok) throw new Error(users.error);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const users = toItems(payload);
     list.innerHTML = users.map(user =>
-      `<article class="user-row"><div><strong>${safe(user.name)}</strong><small>${safe(user.email)}</small></div><span class="role-badge">${safe(user.roles[0].replaceAll('_', ' '))}</span><span class="user-status">${safe(user.status)}</span>${user.status === 'active' ? `<button data-user-status="suspended" data-user="${user.id}">Suspend</button>` : `<button data-user-status="active" data-user="${user.id}">Reactivate</button>`}</article>`
+      `<article class="user-row"><div><strong>${safe(user.name)}</strong><small>${safe(user.email)}</small></div><span class="role-badge">${safe((user.roles && user.roles[0] || 'member').replaceAll('_', ' '))}</span><span class="user-status">${safe(user.status)}</span>${user.status === 'active' ? `<button data-user-status="suspended" data-user="${user.id}">Suspend</button>` : `<button data-user-status="active" data-user="${user.id}">Reactivate</button>`}</article>`
     ).join('');
     document.querySelectorAll('[data-user-status]').forEach(button => button.onclick = async () => {
       const response = await fetch(`/api/users/${button.dataset.user}/status`, {
@@ -412,10 +423,11 @@ async function loadInstruments() {
   const list = $('#instrumentList');
   try {
     const response = await fetch('/api/instruments');
-    const instruments = await response.json();
-    if (!response.ok) throw new Error(instruments.error);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    const instruments = toItems(payload);
     list.innerHTML = instruments.map(item =>
-      `<article class="instrument-card"><span class="status">${safe(item.status)}</span><h2>${safe(item.name)}</h2><p>${item.sections.reduce((total, section) => total + section.questions.length, 0)} questions \u00B7 Version ${item.version || 'draft'}</p><footer><small>Updated ${safe(new Date(item.updatedAt).toLocaleDateString())}</small><button data-open-instrument="${item.id}">Open builder \u2192</button></footer></article>`
+      `<article class="instrument-card"><span class="status">${safe(item.status)}</span><h2>${safe(item.name)}</h2><p>${(item.sections || []).reduce((total, section) => total + (section.questions || []).length, 0)} questions \u00B7 Version ${item.version || 'draft'}</p><footer><small>Updated ${safe(new Date(item.updatedAt).toLocaleDateString())}</small><button data-open-instrument="${item.id}">Open builder \u2192</button></footer></article>`
     ).join('');
     document.querySelectorAll('[data-open-instrument]').forEach(button => button.onclick = async () => {
       state.form.id = button.dataset.openInstrument;
