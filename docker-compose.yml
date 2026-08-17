@@ -1,0 +1,51 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      FIELDWORK_PORT: "3000"
+      FIELDWORK_BOOTSTRAP_PASSWORD: ${FIELDWORK_BOOTSTRAP_PASSWORD:?Set FIELDWORK_BOOTSTRAP_PASSWORD in .env before starting}
+    # Bind locally; put a TLS-terminating reverse proxy in front of this service.
+    ports:
+      - "127.0.0.1:${FIELDWORK_HOST_PORT:-3000}:3000"
+    volumes:
+      # The current application persists its file-backed development store here.
+      - fieldwork_app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fieldwork_internal
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fieldwork}
+      POSTGRES_USER: ${POSTGRES_USER:-fieldwork}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting}
+    volumes:
+      - fieldwork_postgres_data:/var/lib/postgresql/data
+      # Initializes the schema only when the database volume is first created.
+      - ./db/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - fieldwork_internal
+
+# PostgreSQL is provisioned for the repository migration, but server.js currently
+# uses /app/data/store.json and does not read DATABASE_URL. Do not add a
+# DATABASE_URL to the app service until the PostgreSQL repository is implemented.
+volumes:
+  fieldwork_app_data:
+  fieldwork_postgres_data:
+
+networks:
+  fieldwork_internal:
+    internal: true

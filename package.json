@@ -1,0 +1,21 @@
+{
+  "name": "ngo-data-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "vercel-build": "npm ci",
+    "dev": "NODE_ENV=development node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "nodemailer": "^9.0.5",
+    "pg": "^8.10.0",
+    "pg-pool": "^3.6.0",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

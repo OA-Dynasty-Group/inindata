@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "name": "ngo-data-platform",
+  "env": {
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (Supabase direct connection)",
+      "required": false
+    },
+    "DATABASE_URL_PGBOUNCER": {
+      "description": "PostgreSQL connection string with PgBouncer pooling (Supabase PgBouncer mode - recommended for serverless)",
+      "required": false
+    },
+    "NODE_ENV": {
+      "default": "production"
+    },
+    "FIELDWORK_PORT": {
+      "default": "3000"
+    }
+  },
+  "public": false,
+  "buildCommand": "npm ci",
+  "devCommand": "npm start",
+  "installCommand": "npm ci",
+  "framework": "nodejs",
+  "functions": {
+    "server.js": {
+      "runtime": "nodejs18.x",
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
+  ]
+}

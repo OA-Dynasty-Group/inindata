@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fieldwork — Data operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="login.css" />
+    <link rel="stylesheet" href="responses.css" />
+    <link rel="stylesheet" href="dataset.css" />
+    <link rel="stylesheet" href="analytics.css" />
+    <link rel="stylesheet" href="programs.css" />
+    <link rel="stylesheet" href="audit.css" />
+    <link rel="stylesheet" href="reports.css" />
+    <link rel="stylesheet" href="users.css" />
+    <link rel="stylesheet" href="forms.css" />
+    <link rel="stylesheet" href="dashboards.css" />
+    <link rel="stylesheet" href="organization.css" />
+  </head>
+  <body>
+    <div class="login-overlay" id="loginOverlay">
+      <form class="login-card" id="loginForm">
+        <a class="brand" href="#dashboard"><span class="brand-mark">f</span><span>fieldwork</span></a>
+        <p class="eyebrow">COMMUNITY REACH</p>
+        <h1>Welcome back</h1>
+        <p>Sign in to manage your organization’s data.</p>
+        <label>Email<input id="loginEmail" type="email" autocomplete="email" required /></label>
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+        <p class="login-error" id="loginError" hidden></p>
+        <button class="button primary" type="submit">Sign in <span>→</span></button>
+        <small><a href="#password-reset" class="text-button">Forgot your password?</a></small>
+      </form>
+    </div>
+    <div class="password-reset-overlay" id="passwordResetOverlay" hidden>
+      <form class="login-card" id="passwordResetForm">
+        <a class="brand" href="#"><span class="brand-mark">f</span><span>fieldwork</span></a>
+        <h1 id="resetTitle">Reset your password</h1>
+        <p id="resetDescription">Enter your email to receive a password reset link.</p>
+        <label id="resetEmailLabel">Email<input id="resetEmail" type="email" autocomplete="email" /></label>
+        <label id="resetTokenLabel" hidden>Reset code<input id="resetToken" type="hidden" /></label>
+        <label id="resetPasswordLabel" hidden>New password<input id="resetPassword" type="password" minlength="12" /></label>
+        <label id="resetPasswordConfirmLabel" hidden>Confirm password<input id="resetPasswordConfirm" type="password" minlength="12" /></label>
+        <p class="login-error" id="resetError" hidden></p>
+        <button class="button primary" type="submit" id="resetButton">Send reset link</button>
+        <small><a href="#login" class="text-button">Back to sign in</a></small>
+      </form>
+    </div>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#dashboard" aria-label="Fieldwork home"><span class="brand-mark">f</span><span>fieldwork</span></a>
+        <nav aria-label="Main navigation">
+          <a class="nav-link active" href="#dashboard"><span>⌑</span>Overview</a>
+          <p class="nav-label">Collect</p>
+          <a class="nav-link" href="#forms"><span>◫</span>Forms <b>4</b></a>
+          <a class="nav-link" href="#responses"><span>▤</span>Responses <b>12</b></a>
+          <p class="nav-label">Organize</p>
+          <a class="nav-link" href="#programs"><span>◌</span>Programs</a>
+          <a class="nav-link" href="#datasets"><span>▦</span>Datasets</a>
+          <p class="nav-label">Understand</p>
+          <a class="nav-link" href="#analytics"><span>◔</span>Analytics</a>
+          <a class="nav-link" href="#reports"><span>▱</span>Reports</a>
+          <p class="nav-label">Govern</p>
+          <a class="nav-link" href="#users"><span>♙</span>Users</a>
+          <a class="nav-link" href="#audit"><span>◷</span>Audit log</a>
+          <p class="nav-label">Settings</p>
+          <a class="nav-link" href="#settings"><span>⚙</span>Organization</a>
+        </nav>
+        <div class="sidebar-footer"><a href="#settings" style="text-decoration: none; color: inherit;"><div class="org-avatar">CR</div><div><strong>Community Reach</strong><small>Organization settings</small></div><span>⌄</span></a></div>
+      </aside>
+
+      <main>
+        <section id="dashboard" class="page dashboard-page">
+          <header class="topbar"><div><p class="eyebrow">Community Reach</p><h1>Good morning, Amina.</h1></div><div class="top-actions"><button class="icon-button" aria-label="Notifications">♢<i></i></button><button class="avatar" aria-label="Account menu">AM</button></div></header>
+          <div class="welcome-card"><div><p class="eyebrow">DATA COLLECTION · AUGUST 2026</p><h2>Make every response<br />count for more.</h2><p>See how your programs are progressing, and act on the stories your data is telling.</p><a href="#builder" class="button primary">Create a form <span>→</span></a></div><div class="card-graphic" aria-hidden="true"><div class="sun"></div><div class="hill hill-one"></div><div class="hill hill-two"></div><div class="dots">···<br/>····<br/>·····</div></div></div>
+          <section class="metric-grid" aria-label="Key metrics"><article><p>Responses this month</p><h3>1,284</h3><span class="positive">↗ 18.4% <em>vs. last month</em></span><div class="spark spark-green"></div></article><article><p>Active forms</p><h3>4 <small>of 7 total</small></h3><span class="neutral">2 collecting today</span><div class="form-dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article><article><p>Review queue</p><h3>12</h3><span class="warning">● Needs attention</span><a href="#responses">Review responses →</a></article></section>
+          <section class="content-grid"><article class="panel activity"><div class="panel-head"><div><h2>Recent activity</h2><p>Across your organization</p></div><a href="#audit">View all</a></div><div class="activity-list"><div><span class="event-icon green">↑</span><p><strong>124 responses received</strong><small>Community needs assessment · 16 min ago</small></p><time>10:42</time></div><div><span class="event-icon blue">✓</span><p><strong>Baseline survey published</strong><small>Youth employment program · 2 hours ago</small></p><time>08:31</time></div><div><span class="event-icon orange">↓</span><p><strong>Dataset imported</strong><small>2025 program outcomes · Yesterday</small></p><time>Aug 14</time></div></div></article><article class="panel focus"><p class="eyebrow">PROGRAM PULSE</p><h2>Youth Employment</h2><p>August collection progress</p><div class="progress-row"><div class="donut"><span>68<small>%</small></span></div><div><strong>816 <small>of 1,200</small></strong><p>Target responses</p><button class="text-button">View program →</button></div></div></article></section><section class="saved-dashboard panel"><div class="panel-head"><div><h2>Saved dashboards</h2><p>Reusable views of your organization’s data</p></div><a href="#analytics">Create view</a></div><div id="dashboardList" class="dashboard-list">Loading saved dashboards…</div></section>
+        </section>
+
+        <section id="forms" class="page forms-page" hidden><header class="topbar"><div><p class="eyebrow">DATA COLLECTION</p><h1>Forms</h1><p>Create and manage dynamic instruments for programs and research.</p></div><button class="button primary" id="newInstrument">New form <span>+</span></button></header><div class="instrument-list" id="instrumentList">Loading forms…</div></section>
+        <section id="builder" class="page builder-page" hidden>
+          <header class="builder-header"><a href="#forms" class="back">← All forms</a><div class="builder-title"><input id="formName" aria-label="Form name" value="Community needs assessment"/><span id="draftState">Draft · Saved just now</span></div><div class="builder-actions"><button class="button secondary" id="previewButton">Preview</button><button class="button primary" id="publishButton">Publish form</button></div></header>
+          <div class="builder-layout">
+            <aside class="field-panel"><div><p class="eyebrow">ADD TO FORM</p><h2>Questions</h2></div><div class="field-list" id="fieldTypes"><button data-type="shortText"><span>—</span>Short text</button><button data-type="longText"><span>≡</span>Long text</button><button data-type="number"><span>#</span>Number</button><button data-type="singleSelect"><span>◉</span>Single select</button><button data-type="multiSelect"><span>☷</span>Multi-select</button><button data-type="yesNo"><span>◐</span>Yes / No</button><button data-type="date"><span>□</span>Date</button><button data-type="rating"><span>☆</span>Rating</button></div><button class="add-section" id="addSection">＋ Add a section</button></aside>
+            <section class="form-canvas"><div class="canvas-header"><span class="status-pill">DRAFT</span><button class="more" aria-label="Form options">•••</button></div><div id="formSections"></div><button class="add-question" id="addQuestion">＋ Add question</button></section>
+            <aside class="settings-panel" id="settingsPanel"><p class="eyebrow">QUESTION SETTINGS</p><div id="settingsEmpty"><div class="empty-symbol">↖</div><h2>Select a question</h2><p>Choose a question on the form to configure its details and validation.</p></div><form id="questionSettings" hidden><label>Question<label class="required">Required</label><input id="questionLabel" /></label><label>Help text <input id="helpText" placeholder="Optional guidance for respondents" /></label><label>Answer type <select id="answerType"><option value="shortText">Short text</option><option value="longText">Long text</option><option value="number">Number</option><option value="singleSelect">Single select</option><option value="multiSelect">Multi-select</option><option value="yesNo">Yes / No</option><option value="date">Date</option><option value="rating">Rating</option></select></label><div id="optionsSettings" hidden><label>Choices</label><div id="optionInputs"></div><button type="button" class="text-button" id="addOption">＋ Add choice</button></div><div class="logic-settings"><label>Show only when<select id="logicField"></select></label><label>Equals<input id="logicValue" placeholder="Choice value" /></label><button type="button" class="text-button" id="clearLogic">Always show this question</button></div><label class="toggle-row"><span>Required answer<small>Respondents must answer</small></span><input type="checkbox" id="requiredInput" checked /><i></i></label><button type="button" class="danger" id="deleteQuestion">Delete question</button></form></aside>
+          </div>
+        </section>
+
+        <section id="responses" class="page responses-page" hidden><header class="topbar"><div><p class="eyebrow">RESPONSE MANAGEMENT</p><h1>Response review</h1></div><button class="button secondary" id="refreshResponses">Refresh</button></header><div class="response-summary"><strong id="responseCount">0</strong><span>Responses for this form</span></div><div class="response-list" id="responseList"><p>Loading responses…</p></div></section>
+        <section id="datasets" class="page dataset-page" hidden><header class="topbar"><div><p class="eyebrow">DATASET</p><h1 id="datasetName">Responses</h1><span id="datasetMeta">Loading dataset…</span></div><div class="dataset-actions"><button class="button secondary" id="openImport">Import data</button><a class="button secondary" id="exportCsv" href="#">Export CSV ↓</a></div></header><section class="import-panel" id="importPanel" hidden><div><p class="eyebrow">CSV OR XLSX IMPORT</p><h2>Add historical responses</h2><p>Columns are matched to field keys or question labels. Nothing is saved until the preview passes validation.</p></div><div class="import-controls"><input id="csvFile" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /><button class="button primary" id="previewImport">Preview file</button></div><div id="importResult" class="import-result" hidden></div><button class="button primary" id="confirmImport" hidden>Import valid rows</button></section><div class="dataset-toolbar"><label>Search responses <input id="datasetSearch" placeholder="Search any value" /></label><span class="classification">INTERNAL</span></div><div class="dataset-table-wrap"><table><thead id="datasetHead"></thead><tbody id="datasetBody"></tbody></table></div></section>
+        <section id="analytics" class="page analytics-page" hidden><header class="topbar"><div><p class="eyebrow">ANALYTICS</p><h1>Explore your data</h1><p>Choose what you want to see. The chart updates from your collected responses.</p></div><div class="topbar-actions"><button class="button secondary" id="exportChartImage">Export as image</button><button class="button secondary" id="exportChartPDF">Export as PDF</button><button class="button secondary" id="exportChartData">Export data</button><button class="button secondary" id="saveDashboard">Save to dashboard</button></div></header><section class="analytics-config"><div class="config-row"><label>Date range<select id="dateRangeSelect"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="all">All time</option></select></label><label id="customDateLabel" hidden>From<input id="customDateFrom" type="date" /></label><label id="customDateToLabel" hidden>To<input id="customDateTo" type="date" /></label></div><div class="config-row"><label>Measure<select disabled><option>Number of responses</option></select></label><label>Group by<select id="dimensionSelect"></select></label><label>Chart type<select id="chartTypeSelect"><option value="bar">Bar chart (breakdown)</option><option value="pie">Pie chart (distribution)</option><option value="line">Line chart (trends)</option></select></label></div></section><section class="analytics-card"><div><p class="eyebrow">RESPONSE ANALYTICS</p><h2 id="chartTitle">Loading chart…</h2><span id="chartTotal"></span></div><div class="chart-container" id="chartContainer"><div class="bar-chart" id="barChart"></div><canvas id="chartCanvas" style="display: none; max-height: 350px;"></canvas></div><p class="chart-empty" id="chartEmpty" hidden>No responses are available for this grouping yet.</p></section></section>
+        <section id="programs" class="page programs-page" hidden><header class="topbar"><div><p class="eyebrow">ORGANIZATION</p><h1>Programs</h1><p>Keep collection, data, and reporting connected to your work.</p></div><button class="button primary" id="toggleProgramForm">New program <span>+</span></button></header><form id="programForm" class="program-form" hidden><label>Program name<input id="programName" required /></label><label>Program code<input id="programCode" placeholder="e.g. YE-2026" /></label><label>Description<input id="programDescription" /></label><button class="button primary">Create program</button></form><div class="program-list" id="programList">Loading programs…</div></section>
+        <section id="audit" class="page audit-page" hidden><header class="topbar"><div><p class="eyebrow">GOVERNANCE</p><h1>Audit log</h1><p>Protected record of significant organizational activity.</p></div><button class="button secondary" id="refreshAudit">Refresh</button></header><div class="audit-list" id="auditList">Loading audit events…</div></section>
+        <section id="settings" class="page settings-page" hidden><header class="topbar"><div><p class="eyebrow">ADMINISTRATION</p><h1>Organization settings</h1><p>Manage organization details, team members, and security.</p></div></header><div class="settings-grid"><article class="settings-card"><h2>Organization Name</h2><form id="organizationForm" hidden><label>Name<input id="organizationName" required /></label><button class="button primary">Save changes</button></form><div id="organizationDisplay"><p id="organizationNameDisplay">Loading...</p><button class="button secondary" id="editOrganization">Edit</button></div></article><article class="settings-card"><h2>Team Members</h2><p id="memberCount">Loading...</p><button class="button secondary" onclick="location.hash='#users'">Manage users →</button></article><article class="settings-card"><h2>Security</h2><p>Password and authentication settings</p><button class="button secondary" onclick="location.hash='#password-reset'">Change your password →</button></article></div></section>
+        <section id="reports" class="page reports-page" hidden><header class="topbar"><div><p class="eyebrow">REPORTING</p><h1>Reports</h1><p>Save repeatable report definitions based on your live data.</p></div></header><section class="report-builder"><div><p class="eyebrow">NEW REPORT</p><h2>What would you like to share?</h2><p>Start with a response count, select a grouping, then add a short narrative.</p></div><form id="reportForm"><label>Report title<input id="reportTitle" required placeholder="e.g. Community needs summary" /></label><label>Group findings by<select id="reportDimension"></select></label><label>Narrative<textarea id="reportNarrative" placeholder="Add context, findings, or recommendations…"></textarea></label><button class="button primary">Save report <span>→</span></button></form></section><div class="report-list" id="reportList">Loading reports…</div></section>
+        <section id="users" class="page users-page" hidden><header class="topbar"><div><p class="eyebrow">ADMINISTRATION</p><h1>Users & roles</h1><p>Control who can access organization data and workflows.</p></div><button class="button primary" id="toggleUserForm">Add user <span>+</span></button></header><form class="user-form" id="userForm" hidden><label>Full name<input id="userName" required /></label><label>Email<input id="userEmail" type="email" required /></label><label>Role<select id="userRole"><option value="field_worker">Field worker</option><option value="reviewer">Reviewer</option><option value="analyst">Data analyst</option><option value="program_manager">Program manager</option><option value="organization_admin">Organization administrator</option></select></label><label>Initial password<input id="userPassword" type="password" minlength="12" required /></label><button class="button primary">Add user</button></form><div class="user-list" id="userList">Loading users…</div></section>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+    <script src="organization-and-reset.js"></script>
+    <script src="charts.js"></script>
+    <script src="analytics.js"></script>
+    <script src="export.js"></script>
+  </body>
+</html>
