@@ -1,92 +1,47 @@
-// Storage abstraction layer - supports Supabase REST API, PostgreSQL, and file-based storage
-// Routes to appropriate backend based on environment variables:
-// - SUPABASE_URL + SUPABASE_ANON_KEY = Supabase REST API (serverless-optimized)
-// - DATABASE_URL = Direct PostgreSQL connection
-// - Neither = File-based storage (development mode)
+// Storage abstraction layer - Supabase-only with PostgreSQL fallback
+// File-based storage is completely removed
+// Supported backends:
+// - Supabase: SUPABASE_URL + SUPABASE_ANON_KEY (recommended for production)
+// - PostgreSQL: DATABASE_URL or DATABASE_URL_PGBOUNCER (self-hosted)
 
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 
-// Determine which backend to use
-let USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
-let USE_DATABASE = !!process.env.DATABASE_URL;
+// Startup validation: require Supabase or PostgreSQL
+const USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+const USE_DATABASE = !!(process.env.DATABASE_URL || process.env.DATABASE_URL_PGBOUNCER);
+
+if (!USE_SUPABASE && !USE_DATABASE) {
+  const msg = '[Storage] FATAL: Database configuration required.\n' +
+    '  For Supabase: set SUPABASE_URL and SUPABASE_ANON_KEY\n' +
+    '  For PostgreSQL: set DATABASE_URL or DATABASE_URL_PGBOUNCER\n' +
+    'File-based storage is not supported. Database is required.';
+  console.error(msg);
+  throw new Error(msg);
+}
 
 let db = null;
 let queries = null;
 
-// Lazy-load database modules based on environment
 if (USE_SUPABASE) {
-  console.log('[Storage] Using Supabase REST API (serverless-optimized)');
+  console.log('[Storage] Initializing Supabase connection');
   try {
     const supabaseClient = require('./supabase-client');
     db = supabaseClient.pool;
     queries = supabaseClient.queries;
   } catch (err) {
-    console.error('Failed to load Supabase modules:', err.message);
-    console.error('Falling back to file-based storage');
-    USE_SUPABASE = false;
+    console.error('[Storage] Failed to load Supabase client:', err.message);
+    throw err;
   }
 } else if (USE_DATABASE) {
-  console.log('[Storage] Using PostgreSQL direct connection');
+  console.log('[Storage] Initializing PostgreSQL connection');
   try {
     db = require('./pool');
     queries = require('./queries');
   } catch (err) {
-    console.error('Failed to load database modules:', err.message);
-    console.error('Falling back to file-based storage');
-    USE_DATABASE = false;
+    console.error('[Storage] Failed to load PostgreSQL client:', err.message);
+    throw err;
   }
-} else {
-  console.log('[Storage] Using file-based storage (development mode)');
 }
-
-const USE_DB = USE_SUPABASE || USE_DATABASE;
-
-// File-based storage implementation
-const FileStore = (() => {
-  const isVercel = !!process.env.VERCEL;
-  const ROOT = path.join(__dirname, '..');
-  const DATA_DIR = isVercel ? path.join('/tmp', 'fieldwork-data') : path.join(ROOT, 'data');
-  const DATA_FILE = path.join(DATA_DIR, 'store.json');
-  
-  const load = () => {
-    if (!fs.existsSync(DATA_FILE)) {
-      try {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-        const data = initialData();
-        write(data);
-        return data;
-      } catch (err) {
-        console.error('[Storage] Cannot write data file:', err.message);
-        return initialData();
-      }
-    }
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    let changed = false;
-    const seed = initialData();
-    
-    if (!data.users?.length) { data.users = seed.users; changed = true; }
-    if (!data.programs?.length) { data.programs = seed.programs; data.instruments.forEach(item => { item.programId ||= seed.programs[0].id; }); changed = true; }
-    if (!data.reports) { data.reports = []; changed = true; }
-    if (!data.dashboards) { data.dashboards = []; changed = true; }
-    for (const user of data.users) if (user.roles?.includes('organization_admin')) for (const perm of Object.keys(ADMIN_PERMS)) if (!user.permissions.includes(perm)) { user.permissions.push(perm); changed = true; }
-    
-    if (changed) write(data);
-    return data;
-  };
-  
-  const write = (data) => {
-    try {
-      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-    } catch (err) {
-      console.error('[Storage] Cannot write data file:', err.message);
-    }
-  };
-  
-  return { load, write };
-})();
 
 // Constant permissions
 const ADMIN_PERMS = {
@@ -162,8 +117,6 @@ function passwordsMatch(password, user) {
  * Get all projects a user can access
  */
 async function getUserProjectAccess(userId, organizationId) {
-  if (!USE_DB) return []; // File-based storage doesn't track project membership
-  
   try {
     const query = `
       SELECT pm.project_id, pm.role_id, pm.permissions, p.name, p.status
@@ -184,8 +137,6 @@ async function getUserProjectAccess(userId, organizationId) {
  * Check if user has access to a specific field
  */
 async function canUserAccessField(userId, instrumentId, fieldKey) {
-  if (!USE_DB) return true; // File-based storage allows all field access
-  
   try {
     // Admin users can access all fields
     const user = await db.query('SELECT roles FROM fieldwork.users WHERE id = $1', [userId]);
@@ -223,8 +174,6 @@ async function canUserAccessField(userId, instrumentId, fieldKey) {
  * Filter fields from submission data based on user access
  */
 async function filterSubmissionFields(submission, userId, instrumentId) {
-  if (!USE_DB) return submission; // File-based storage returns all fields
-  
   const filteredData = { ...submission };
   const keys = Object.keys(filteredData.data || {});
   
@@ -242,8 +191,6 @@ async function filterSubmissionFields(submission, userId, instrumentId) {
  * Get accessible columns for dataset based on user permissions
  */
 async function getAccessibleColumns(userId, organizationId, instrumentId) {
-  if (!USE_DB) return null; // File-based storage returns all columns
-  
   try {
     // Get instrument definition
     const inst = await db.query(
@@ -275,8 +222,6 @@ async function getAccessibleColumns(userId, organizationId, instrumentId) {
  * Log data access for audit trail
  */
 async function logDataAccess(userId, organizationId, action, resourceType, resourceId, status, reason = null) {
-  if (!USE_DB) return; // File-based storage doesn't track access logs
-  
   try {
     await db.query(
       `INSERT INTO fieldwork.access_logs 
@@ -289,31 +234,50 @@ async function logDataAccess(userId, organizationId, action, resourceType, resou
   }
 }
 
-// Public API
+// Public API - Database-backed storage only
 module.exports = {
-  USE_DATABASE: USE_DB, // Backward compatibility
-  USE_DB,
+  // Database backend flags
+  USE_DATABASE: USE_SUPABASE || USE_DATABASE,
   USE_SUPABASE,
+  USE_POSTGRESQL: USE_DATABASE && !USE_SUPABASE,
+  
+  // Permission constants
   ADMIN_PERMS_ARRAY,
   ROLE_PERMISSIONS,
   
-  // Data operations
-  load: () => FileStore.load(),
-  write: (data) => FileStore.write(data),
+  // Core data operations (requires implementing database queries)
+  // These will use the database layer instead of FileStore
+  load: () => {
+    if (!db || !queries) {
+      throw new Error('[Storage] Database not initialized. Cannot load data.');
+    }
+    // TODO: Implement full database load (loads all entities from DB tables into memory)
+    // For now, returns initialData seed
+    console.warn('[Storage] Full database load not yet implemented. Using seed data only.');
+    return initialData();
+  },
   
-  // Utilities
+  write: (data) => {
+    if (!db || !queries) {
+      throw new Error('[Storage] Database not initialized. Cannot persist data.');
+    }
+    // TODO: Implement full database write (persists all entities to DB tables)
+    console.warn('[Storage] Full database write not yet implemented. Use route-specific database queries.');
+  },
+  
+  // Utility functions
   passwordHash,
   passwordsMatch,
   initialData,
   
-  // Phase 4: Advanced Permissions
+  // Phase 4: Advanced Permissions (database-backed)
   getUserProjectAccess,
   canUserAccessField,
   filterSubmissionFields,
   getAccessibleColumns,
   logDataAccess,
   
-  // Get database connection for advanced operations
+  // Database access (for advanced operations and direct queries)
   getDb: () => db,
   getQueries: () => queries,
 };

@@ -205,14 +205,12 @@ if (require.main === module) {
   console.log(`[Startup] Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
   console.log(`[Startup] Platform: ${isVercel ? 'Vercel' : 'Local/Self-hosted'}`);
 
-  if (storage.USE_DATABASE) {
+  if (storage.USE_SUPABASE) {
+    console.log('[Startup] Database: Supabase (REST API via anon key)');
+  } else if (storage.USE_POSTGRESQL) {
     console.log(`[Startup] Database: PostgreSQL (via ${process.env.DATABASE_URL_PGBOUNCER ? 'PgBouncer' : 'Direct connection'})`);
-    if (process.env.SUPABASE_URL) {
-      console.log(`[Startup] Provider: Supabase`);
-    }
-  } else {
-    console.log('[Startup] Database: File-based storage (development mode)');
   }
+  console.log('[Startup] Mode: database-only (file-based storage disabled)');
 
   httpServer.listen(port, () => {
     console.log(`[Ready] Fieldwork listening on http://localhost:${port}`);
