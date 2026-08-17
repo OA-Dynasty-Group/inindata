@@ -17,7 +17,6 @@
       "default": "3000"
     }
   },
-  "public": false,
   "buildCommand": "npm ci",
   "devCommand": "npm start",
   "installCommand": "npm ci",
