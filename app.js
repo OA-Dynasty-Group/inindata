@@ -679,6 +679,7 @@ async function boot() {
     $('#passwordResetOverlay').hidden = true;
     App.org.setup();
   }
+}
 
 $('#loginForm').onsubmit = async event => {
   event.preventDefault();
