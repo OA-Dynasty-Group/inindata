@@ -114,7 +114,7 @@ function jsonCached(res, code, body, cacheKey, ttl = cache.TTL.ANALYTICS) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+const handler = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`); const segments = url.pathname.split('/').filter(Boolean); const data = load();
   try {
     if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { status: 'ok' });
@@ -323,16 +323,30 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && segments[0] === 'collect' && segments[1]) return staticFile(res, '/collect.html');
     return staticFile(res, url.pathname);
   } catch (error) { return json(res, error.message === 'Invalid JSON body' ? 400 : 500, { error: error.message || 'Unexpected server error.' }); }
-});
-if (require.main === module) { 
+};
+module.exports = handler;
+module.exports.default = handler;
+module.exports.validateDefinition = validateDefinition;
+module.exports.validateSubmission = validateSubmission;
+module.exports.initialData = initialData;
+module.exports.datasetFor = datasetFor;
+module.exports.parseCsv = parseCsv;
+module.exports.importPreview = importPreview;
+module.exports.workbookPreview = workbookPreview;
+module.exports.aggregateDataset = aggregateDataset;
+module.exports.canReviewTransition = canReviewTransition;
+module.exports.isVisible = isVisible;
+module.exports.rolePermissions = rolePermissions;
+if (require.main === module) {
+  const httpServer = http.createServer(handler);
   const port = process.env.FIELDWORK_PORT || 3000;
   const isProduction = process.env.NODE_ENV === 'production';
   const isVercel = !!process.env.VERCEL;
-  
+
   // Log startup environment
   console.log(`[Startup] Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
   console.log(`[Startup] Platform: ${isVercel ? 'Vercel' : 'Local/Self-hosted'}`);
-  
+
   // Log which backend is active
   if (storage.USE_DATABASE) {
     console.log(`[Startup] Database: PostgreSQL (via ${process.env.DATABASE_URL_PGBOUNCER ? 'PgBouncer' : 'Direct connection'})`);
@@ -342,9 +356,8 @@ if (require.main === module) {
   } else {
     console.log('[Startup] Database: File-based storage (development mode)');
   }
-  
-  server.listen(port, () => {
+
+  httpServer.listen(port, () => {
     console.log(`[Ready] Fieldwork listening on http://localhost:${port}`);
   });
 }
-module.exports = { validateDefinition, validateSubmission, initialData, datasetFor, parseCsv, importPreview, workbookPreview, aggregateDataset, canReviewTransition, isVisible, rolePermissions };
