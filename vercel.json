@@ -5,7 +5,19 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "*.html",
+          "*.css",
+          "app.js",
+          "charts.js",
+          "export.js",
+          "analytics.js",
+          "collect.js",
+          "organization-and-reset.js"
+        ]
+      }
     }
   ],
   "routes": [
