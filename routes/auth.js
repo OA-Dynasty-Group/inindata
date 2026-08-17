@@ -139,7 +139,22 @@ async function login(req, res, data) {
 
       let fwUser = data.users?.find(u => u.supabaseUserId === authUser.id && u.status === 'active');
       if (!fwUser) fwUser = data.users?.find(u => u.email === authUser.email && u.status === 'active');
-      if (!fwUser) return json(res, 404, { error: 'User account not found in Fieldwork. Please contact your administrator.' });
+      if (!fwUser) {
+        fwUser = {
+          id: crypto.randomUUID(),
+          supabaseUserId: authUser.id,
+          name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+          email: authUser.email,
+          status: 'active',
+          roles: ['admin'],
+          permissions: storage.ADMIN_PERMS_ARRAY,
+          createdAt: new Date().toISOString()
+        };
+        if (!data.users) data.users = [];
+        data.users.push(fwUser);
+        audit(data, 'LOGIN_PROVISION', 'user', fwUser.id, { email: fwUser.email, source: 'supabase-jit' });
+        write(data);
+      }
 
       if (!fwUser.supabaseUserId) fwUser.supabaseUserId = authUser.id;
 

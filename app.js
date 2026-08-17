@@ -435,6 +435,10 @@ function showPage() {
     $('#dashboard').hidden = false;
     loadDashboards();
   }
+  if (target === '') {
+    $('#dashboard').hidden = false;
+    loadDashboards();
+  }
   if (target === 'forms') loadInstruments();
   if (target === 'responses') loadResponses();
   if (target === 'datasets') loadDataset();
@@ -443,9 +447,17 @@ function showPage() {
   if (target === 'audit') loadAudit();
   if (target === 'reports') loadReports();
   if (target === 'users') loadUsers();
+  if (target === 'password-reset') {
+    App.org.showPasswordResetForm();
+    return;
+  }
+  if (target === 'settings') {
+    App.org.setupSettingsPage();
+    return;
+  }
 }
 
-['', 'dashboard', 'builder', 'forms', 'responses', 'datasets', 'analytics', 'programs', 'audit', 'reports', 'users'].forEach(route => {
+['', 'dashboard', 'builder', 'forms', 'responses', 'datasets', 'analytics', 'programs', 'audit', 'reports', 'users', 'password-reset', 'settings'].forEach(route => {
   App.router.on(route, () => showPage());
 });
 
@@ -644,6 +656,13 @@ async function boot() {
     $('#signupOverlay').hidden = true;
     return;
   }
+  if (hash === '#password-reset') {
+    $('#loginOverlay').hidden = true;
+    $('#signupOverlay').hidden = true;
+    $('#passwordResetOverlay').hidden = false;
+    App.org.showPasswordResetForm();
+    return;
+  }
   try {
     const response = await fetch('/api/me');
     if (!response.ok) throw new Error('Not signed in');
@@ -651,14 +670,15 @@ async function boot() {
     $('#signupOverlay').hidden = true;
     $('#passwordResetOverlay').hidden = true;
     await loadForm();
+    App.org.setup();
     initRouter();
     App.dashboard.load();
   } catch {
     $('#loginOverlay').hidden = false;
     $('#signupOverlay').hidden = true;
     $('#passwordResetOverlay').hidden = true;
+    App.org.setup();
   }
-}
 
 $('#loginForm').onsubmit = async event => {
   event.preventDefault();
@@ -716,7 +736,17 @@ $('#signupForm').onsubmit = async event => {
   }
 };
 
-$('#showSignup').onclick = e => { e.preventDefault(); location.hash = '#signup'; };
-$('#showLogin').onclick = e => { e.preventDefault(); location.hash = '#login'; };
+$('#showSignup').onclick = e => {
+  e.preventDefault();
+  location.hash = '#signup';
+  $('#loginOverlay').hidden = true;
+  $('#signupOverlay').hidden = false;
+};
+$('#showLogin').onclick = e => {
+  e.preventDefault();
+  location.hash = '#login';
+  $('#loginOverlay').hidden = false;
+  $('#signupOverlay').hidden = true;
+};
 
 boot();
