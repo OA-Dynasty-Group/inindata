@@ -8,7 +8,7 @@
   "buildCommand": "npm ci",
   "devCommand": "npm start",
   "installCommand": "npm ci",
-  "framework": "nodejs",
+  "framework": "node",
   "functions": {
     "server.js": {
       "runtime": "nodejs18.x",
